@@ -1,144 +1,123 @@
 <?php
+
 namespace App\Controllers;
 
+use App\Core\DB;
 use App\Core\ApiResponse;
 use App\Models\Student;
-use App\Models\LinkRequest;
-use App\Models\SchoolClass;
-use App\Models\User;
-use App\Core\DB;
+use RuntimeException;
 
+/**
+ * Контроллер для родителей.
+ */
 class ParentController extends BaseController
 {
-    public function getChildren($db, $payload): void
+    /**
+     * Получить список детей текущего родителя.
+     *
+     * @param DB $db
+     * @param array $payload
+     * @return ApiResponse
+     */
+    public function getChildren(DB $db, array $payload): ApiResponse
     {
-        $user = $this->getCurrentUser();
-        if (!$user) {
-            ApiResponse::error('Требуется авторизация', 401);
+        $token = $this->extractTokenFromHeader();
+        if (!$token) {
+            return ApiResponse::error('Token required.', 401);
         }
-        $children = Student::getChildrenByParent($user->id);
-        ApiResponse::success($children);
+
+        // Проверяем роль
+        try {
+            $this->requireRole($token, 'parent');
+        } catch (RuntimeException $e) {
+            return ApiResponse::error($e->getMessage(), 403);
+        }
+
+        // Получаем текущего пользователя
+        $user = $this->getCurrentUser($token);
+        if (!$user) {
+            return ApiResponse::error('User not found.', 404);
+        }
+
+        // Ищем запись родителя по user_id
+        $parent = $db->fetch("SELECT id FROM parents WHERE user_id = :user_id", ['user_id' => $user['id']]);
+        if (!$parent) {
+            return ApiResponse::error('Parent profile not found.', 404);
+        }
+
+        $parentId = $parent['id'];
+
+        // Получаем всех учеников, связанных с этим родителем
+        $children = $db->fetchAll(
+            "SELECT s.*, u.full_name, u.email, c.name as class_name
+             FROM parent_student ps
+             JOIN students s ON ps.student_id = s.id
+             JOIN users u ON s.user_id = u.id
+             LEFT JOIN classes c ON s.class_id = c.id
+             WHERE ps.parent_id = :parent_id",
+            ['parent_id' => $parentId]
+        );
+
+        return ApiResponse::success($children);
     }
 
-    public function addChild($db, $payload): void
+    /**
+     * Добавить ребёнка (привязать ученика к родителю).
+     * Ожидает student_id в payload.
+     *
+     * @param DB $db
+     * @param array $payload
+     * @return ApiResponse
+     */
+    public function addChild(DB $db, array $payload): ApiResponse
     {
-        $user = $this->getCurrentUser();
-        if (!$user || $user->role !== 'parent') {
-            ApiResponse::error('Доступ запрещен', 403);
+        $token = $this->extractTokenFromHeader();
+        if (!$token) {
+            return ApiResponse::error('Token required.', 401);
         }
 
-        $required = ['snils', 'full_name', 'class_id', 'birth_date'];
-        foreach ($required as $field) {
-            if (empty($payload[$field])) {
-                ApiResponse::error("Поле $field обязательно", 400);
-            }
+        try {
+            $this->requireRole($token, 'parent');
+        } catch (RuntimeException $e) {
+            return ApiResponse::error($e->getMessage(), 403);
         }
 
-        $existing = Student::findBySnils($payload['snils']);
-        if ($existing) {
-            ApiResponse::error('Ученик с таким СНИЛС уже зарегистрирован', 409);
+        if (empty($payload['student_id'])) {
+            return ApiResponse::error('student_id is required.', 400);
         }
 
-        $classes = SchoolClass::getAll();
-        $classExists = false;
-        foreach ($classes as $c) {
-            if ($c['id'] == $payload['class_id']) {
-                $classExists = true;
-                break;
-            }
-        }
-        if (!$classExists) {
-            ApiResponse::error('Указанный класс не найден', 400);
+        $studentId = (int)$payload['student_id'];
+
+        // Проверяем, существует ли ученик
+        $student = Student::find($studentId);
+        if (!$student) {
+            return ApiResponse::error('Student not found.', 404);
         }
 
-        $dormitory = isset($payload['dormitory']) && $payload['dormitory'] ? 1 : 0;
+        // Получаем текущего родителя
+        $user = $this->getCurrentUser($token);
+        $parent = $db->fetch("SELECT id FROM parents WHERE user_id = :user_id", ['user_id' => $user['id']]);
+        if (!$parent) {
+            return ApiResponse::error('Parent profile not found.', 404);
+        }
 
-        $result = Student::create([
-            'snils' => $payload['snils'],
-            'full_name' => $payload['full_name'],
-            'class_id' => (int)$payload['class_id'],
-            'birth_date' => $payload['birth_date'],
-            'dormitory' => $dormitory,
+        $parentId = $parent['id'];
+
+        // Проверяем, не связаны ли уже
+        $exists = $db->fetch(
+            "SELECT 1 FROM parent_student WHERE parent_id = :parent_id AND student_id = :student_id",
+            ['parent_id' => $parentId, 'student_id' => $studentId]
+        );
+        if ($exists) {
+            return ApiResponse::error('This student is already linked to you.', 409);
+        }
+
+        // Вставляем связь
+        $db->insert('parent_student', [
+            'parent_id'  => $parentId,
+            'student_id' => $studentId
         ]);
 
-        Student::linkToParent($result['id'], $user->id);
-
-        ApiResponse::success([
-            'student_id' => $result['id'],
-            'temporary_password' => $result['password']
-        ], 'Ученик добавлен');
-    }
-
-    public function linkChild($db, $payload): void
-    {
-        $user = $this->getCurrentUser();
-        if (!$user || $user->role !== 'parent') {
-            ApiResponse::error('Доступ запрещен', 403);
-        }
-
-        $snils = $payload['snils'] ?? '';
-        if (empty($snils)) {
-            ApiResponse::error('СНИЛС обязателен', 400);
-        }
-
-        $student = Student::findBySnils($snils);
-        if (!$student) {
-            ApiResponse::error('Ученик с таким СНИЛС не найден', 404);
-        }
-
-        $children = Student::getChildrenByParent($user->id);
-        foreach ($children as $child) {
-            if ($child->id === $student->id) {
-                ApiResponse::error('Этот ученик уже привязан к вам', 409);
-            }
-        }
-
-        $parents = Student::getParents($student->id);
-        if (empty($parents)) {
-            Student::linkToParent($student->id, $user->id);
-            ApiResponse::success(null, 'Ученик успешно привязан');
-        } else {
-            $toParentId = $parents[0]['id'];
-            $requestId = LinkRequest::create($student->id, $user->id, $toParentId);
-            ApiResponse::success(['request_id' => $requestId], 'Запрос на привязку отправлен');
-        }
-    }
-
-    public function getPendingLinks($db, $payload): void
-    {
-        $user = $this->getCurrentUser();
-        if (!$user || $user->role !== 'parent') {
-            ApiResponse::error('Доступ запрещен', 403);
-        }
-
-        $requests = LinkRequest::getPendingForParent($user->id);
-        ApiResponse::success($requests);
-    }
-
-    public function confirmLink($db, $payload): void
-    {
-        $user = $this->getCurrentUser();
-        if (!$user || $user->role !== 'parent') {
-            ApiResponse::error('Доступ запрещен', 403);
-        }
-
-        $requestId = (int)($payload['request_id'] ?? 0);
-        $action = $payload['action'] ?? '';
-
-        if ($requestId <= 0 || !in_array($action, ['accepted', 'rejected'])) {
-            ApiResponse::error('Неверные параметры', 400);
-        }
-
-        $request = DB::fetch("SELECT * FROM link_requests WHERE id = :id", ['id' => $requestId]);
-        if (!$request || $request['to_parent_id'] != $user->id) {
-            ApiResponse::error('Запрос не найден или не адресован вам', 404);
-        }
-
-        $result = LinkRequest::confirm($requestId, $action);
-        if (!$result) {
-            ApiResponse::error('Не удалось подтвердить запрос', 500);
-        }
-
-        ApiResponse::success(null, 'Запрос ' . ($action === 'accepted' ? 'подтвержден' : 'отклонен'));
+        return ApiResponse::success(null, 'Student linked successfully.');
     }
 }
