@@ -513,4 +513,78 @@ class AdminController extends BaseController
 
         return ApiResponse::success(['message' => 'Шаблон удалён']);
     }
+
+    // ========== Управление особыми графиками питания ==========
+
+    public function canteenSpecialAdd(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) return ApiResponse::error('Token required.', 401);
+        try { $this->requireRole($token, 'admin'); } catch (RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
+
+        $user = $this->getCurrentUser($token);
+        $studentId = (int)($payload['student_id'] ?? 0);
+        if ($studentId <= 0) return ApiResponse::error('student_id is required.', 400);
+        if (empty($payload['description'])) return ApiResponse::error('description is required.', 400);
+
+        $student = \App\Models\Student::find($studentId);
+        if (!$student) return ApiResponse::error('Student not found.', 404);
+
+        try {
+            $id = \App\Models\CanteenSpecialMeal::add($studentId, $payload['description'], $user['id']);
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to add special meal: ' . $e->getMessage(), 500);
+        }
+
+        file_put_contents(
+            __DIR__ . '/../../storage/logs/canteen.log',
+            date('Y-m-d H:i:s') . " [admin user_id: {$user['id']}] Добавлен особый график ID $id для студента $studentId\n",
+            FILE_APPEND
+        );
+
+        return ApiResponse::success(['special_id' => $id, 'message' => 'Особый график добавлен']);
+    }
+
+    public function canteenSpecialRemove(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) return ApiResponse::error('Token required.', 401);
+        try { $this->requireRole($token, 'admin'); } catch (RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
+
+        $user = $this->getCurrentUser($token);
+        $id = (int)($payload['id'] ?? 0);
+        if ($id <= 0) return ApiResponse::error('id is required.', 400);
+
+        $special = \App\Models\CanteenSpecialMeal::find($id);
+        if (!$special) return ApiResponse::error('Special meal record not found.', 404);
+
+        try {
+            \App\Models\CanteenSpecialMeal::remove($id);
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to remove special meal: ' . $e->getMessage(), 500);
+        }
+
+        file_put_contents(
+            __DIR__ . '/../../storage/logs/canteen.log',
+            date('Y-m-d H:i:s') . " [admin user_id: {$user['id']}] Удалён особый график ID $id\n",
+            FILE_APPEND
+        );
+
+        return ApiResponse::success(['message' => 'Особый график удалён']);
+    }
+
+    public function canteenSpecialList(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) return ApiResponse::error('Token required.', 401);
+        try { $this->requireRole($token, ['admin', 'canteen']); } catch (RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
+
+        $studentId = isset($payload['student_id']) ? (int)$payload['student_id'] : null;
+        if ($studentId) {
+            $list = \App\Models\CanteenSpecialMeal::getByStudent($studentId);
+        } else {
+            $list = \App\Models\CanteenSpecialMeal::getAll();
+        }
+        return ApiResponse::success($list);
+    }
 }

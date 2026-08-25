@@ -1350,6 +1350,77 @@ URL: /api.php?method=system.checkExpiredDocuments
 }
 }
 
+##Классный руководитель (методы, требующие роль teacher или admin)
+###teacher.seating.get – получить рассадку класса.
+
+Параметры: class_id (опционально, для учителя по умолчанию его класс).
+
+Ответ: массив объектов с полями student_id, student_name, table_number, seat_number.
+
+###teacher.seating.set – установить/обновить рассадку класса.
+
+Параметры: class_id (опционально), seats – массив [{student_id, table_number, seat_number}].
+
+Ответ: {message: "Рассадка обновлена"}.
+
+###teacher.seating.clear – очистить рассадку класса.
+
+Параметры: class_id (опционально).
+
+Ответ: {message: "Рассадка очищена"}.
+
+###teacher.attendance.mark – отметить присутствие учеников на обеде.
+
+Параметры: date (опционально, по умолчанию сегодня), student_ids (массив ID) или class_id (отметить весь класс).
+
+Ответ: {marked_count: N, date: "YYYY-MM-DD"}.
+
+###teacher.attendance.get – получить отметки за период.
+
+Параметры: class_id (опционально), date_from, date_to.
+
+Ответ: массив записей с полями student_id, student_name, date, is_present.
+
+##Сотрудник столовой (роль canteen или admin)
+###canteen.seating.getToday – получить итоговую рассадку на сегодня с учётом отметок.
+
+Параметры: date (опционально, по умолчанию сегодня).
+
+Ответ: структура {first_flow: [...], second_flow: [...]}, где каждый элемент содержит table_number, seat_number, student_id, student_name, class_name, is_dormitory.
+
+###canteen.seating.export – выгрузить рассадку в CSV или JSON.
+
+Параметры: date (опционально), format (csv или json, по умолчанию csv).
+
+Для CSV: возвращает файл с заголовками.
+
+Для JSON: возвращает массив данных.
+
+###canteen.stats.get – статистика по питанию.
+
+Параметры: date (опционально).
+
+Ответ: {date, present_count, total_students, special_meals: [...]}.
+
+##Администратор
+###admin.canteen.special.add – добавить особый график питания.
+
+Параметры: student_id, description.
+
+Ответ: {special_id, message}.
+
+###admin.canteen.special.remove – удалить особый график.
+
+Параметры: id.
+
+Ответ: {message}.
+
+###admin.canteen.special.list – список особых графиков (доступно также для canteen).
+
+Параметры: student_id (опционально).
+
+Ответ: массив записей.
+
 ##Примечания по использованию
 
 Для загрузки файлов документов используйте multipart/form-data (как и для достижений).
