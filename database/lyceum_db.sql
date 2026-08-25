@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Хост: 127.0.0.1
--- Время создания: Авг 25 2026 г., 18:40
+-- Время создания: Авг 25 2026 г., 22:32
 -- Версия сервера: 10.4.27-MariaDB
 -- Версия PHP: 7.4.33
 
@@ -94,6 +94,51 @@ PARTITION p202411 VALUES LESS THAN (202412) ENGINE=InnoDB,
 PARTITION p202412 VALUES LESS THAN (202501) ENGINE=InnoDB,
 PARTITION p_future VALUES LESS THAN MAXVALUE ENGINE=InnoDB
 );
+
+-- --------------------------------------------------------
+
+--
+-- Структура таблицы `canteen_attendance`
+--
+
+CREATE TABLE `canteen_attendance` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `student_id` int(10) UNSIGNED NOT NULL,
+  `date` date NOT NULL,
+  `is_present` tinyint(1) NOT NULL DEFAULT 0,
+  `marked_by` int(10) UNSIGNED NOT NULL,
+  `marked_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Структура таблицы `canteen_seating`
+--
+
+CREATE TABLE `canteen_seating` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `class_id` int(10) UNSIGNED NOT NULL,
+  `student_id` int(10) UNSIGNED NOT NULL,
+  `table_number` int(10) UNSIGNED NOT NULL,
+  `seat_number` int(10) UNSIGNED NOT NULL,
+  `updated_by` int(10) UNSIGNED NOT NULL,
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Структура таблицы `canteen_special_meals`
+--
+
+CREATE TABLE `canteen_special_meals` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `student_id` int(10) UNSIGNED NOT NULL,
+  `description` text NOT NULL,
+  `created_by` int(10) UNSIGNED NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -295,6 +340,28 @@ PARTITION p_future VALUES LESS THAN MAXVALUE ENGINE=InnoDB
 -- --------------------------------------------------------
 
 --
+-- Структура таблицы `leave_requests`
+--
+
+CREATE TABLE `leave_requests` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `student_id` int(10) UNSIGNED NOT NULL,
+  `parent_id` int(10) UNSIGNED DEFAULT NULL,
+  `start_time` datetime NOT NULL,
+  `end_time` datetime NOT NULL,
+  `exit_time` datetime DEFAULT NULL,
+  `entry_time` datetime DEFAULT NULL,
+  `status` enum('draft','pending','approved','rejected','exited','returned','overdue') NOT NULL DEFAULT 'pending',
+  `qr_code` varchar(255) DEFAULT NULL,
+  `created_by` int(10) UNSIGNED NOT NULL,
+  `moderator_comment` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Структура таблицы `link_requests`
 --
 
@@ -405,7 +472,7 @@ CREATE TABLE `users` (
   `id` int(10) UNSIGNED NOT NULL,
   `email` varchar(255) NOT NULL,
   `password_hash` varchar(255) NOT NULL,
-  `role` enum('admin','teacher','parent','student') NOT NULL,
+  `role` enum('admin','teacher','parent','student','canteen') NOT NULL,
   `full_name` varchar(255) NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NULL DEFAULT NULL ON UPDATE current_timestamp(),
@@ -444,6 +511,34 @@ ALTER TABLE `achievement_categories`
 ALTER TABLE `audit_logs`
   ADD PRIMARY KEY (`id`,`created_at`),
   ADD KEY `idx_user_id` (`user_id`);
+
+--
+-- Индексы таблицы `canteen_attendance`
+--
+ALTER TABLE `canteen_attendance`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `unique_daily` (`student_id`,`date`),
+  ADD KEY `student_id` (`student_id`),
+  ADD KEY `date` (`date`),
+  ADD KEY `marked_by` (`marked_by`);
+
+--
+-- Индексы таблицы `canteen_seating`
+--
+ALTER TABLE `canteen_seating`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `unique_seating` (`class_id`,`student_id`),
+  ADD KEY `class_id` (`class_id`),
+  ADD KEY `student_id` (`student_id`),
+  ADD KEY `fk_seating_user` (`updated_by`);
+
+--
+-- Индексы таблицы `canteen_special_meals`
+--
+ALTER TABLE `canteen_special_meals`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `student_id` (`student_id`),
+  ADD KEY `fk_special_user` (`created_by`);
 
 --
 -- Индексы таблицы `classes`
@@ -540,6 +635,18 @@ ALTER TABLE `kpp_logs`
   ADD KEY `idx_student_id` (`student_id`);
 
 --
+-- Индексы таблицы `leave_requests`
+--
+ALTER TABLE `leave_requests`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `student_id` (`student_id`),
+  ADD KEY `status` (`status`),
+  ADD KEY `start_time` (`start_time`),
+  ADD KEY `end_time` (`end_time`),
+  ADD KEY `fk_leave_parent` (`parent_id`),
+  ADD KEY `fk_leave_creator` (`created_by`);
+
+--
 -- Индексы таблицы `link_requests`
 --
 ALTER TABLE `link_requests`
@@ -623,6 +730,24 @@ ALTER TABLE `audit_logs`
   MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
+-- AUTO_INCREMENT для таблицы `canteen_attendance`
+--
+ALTER TABLE `canteen_attendance`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT для таблицы `canteen_seating`
+--
+ALTER TABLE `canteen_seating`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT для таблицы `canteen_special_meals`
+--
+ALTER TABLE `canteen_special_meals`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT для таблицы `classes`
 --
 ALTER TABLE `classes`
@@ -677,6 +802,12 @@ ALTER TABLE `kpp_logs`
   MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
+-- AUTO_INCREMENT для таблицы `leave_requests`
+--
+ALTER TABLE `leave_requests`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT для таблицы `link_requests`
 --
 ALTER TABLE `link_requests`
@@ -722,6 +853,28 @@ ALTER TABLE `users`
 ALTER TABLE `achievements`
   ADD CONSTRAINT `fk_achievements_category` FOREIGN KEY (`category_id`) REFERENCES `achievement_categories` (`id`),
   ADD CONSTRAINT `fk_achievements_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE;
+
+--
+-- Ограничения внешнего ключа таблицы `canteen_attendance`
+--
+ALTER TABLE `canteen_attendance`
+  ADD CONSTRAINT `fk_attendance_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_attendance_user` FOREIGN KEY (`marked_by`) REFERENCES `users` (`id`);
+
+--
+-- Ограничения внешнего ключа таблицы `canteen_seating`
+--
+ALTER TABLE `canteen_seating`
+  ADD CONSTRAINT `fk_seating_class` FOREIGN KEY (`class_id`) REFERENCES `classes` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_seating_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_seating_user` FOREIGN KEY (`updated_by`) REFERENCES `users` (`id`);
+
+--
+-- Ограничения внешнего ключа таблицы `canteen_special_meals`
+--
+ALTER TABLE `canteen_special_meals`
+  ADD CONSTRAINT `fk_special_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_special_user` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`);
 
 --
 -- Ограничения внешнего ключа таблицы `classes`
@@ -778,6 +931,14 @@ ALTER TABLE `event_registrations`
 ALTER TABLE `event_tag_links`
   ADD CONSTRAINT `fk_event_tag_event` FOREIGN KEY (`event_id`) REFERENCES `events` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `fk_event_tag_tag` FOREIGN KEY (`tag_id`) REFERENCES `event_tags` (`id`) ON DELETE CASCADE;
+
+--
+-- Ограничения внешнего ключа таблицы `leave_requests`
+--
+ALTER TABLE `leave_requests`
+  ADD CONSTRAINT `fk_leave_creator` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`),
+  ADD CONSTRAINT `fk_leave_parent` FOREIGN KEY (`parent_id`) REFERENCES `parents` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_leave_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE;
 
 --
 -- Ограничения внешнего ключа таблицы `link_requests`

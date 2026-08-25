@@ -33,4 +33,30 @@ class SystemController extends BaseController
             'message' => "Обновлено $count документов со статусом expired"
         ]);
     }
+
+    /**
+     * Проверка просроченных выходов (вызывается по крону)
+     */
+    public function checkOverdueLeaves(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) {
+            return ApiResponse::error('Token required.', 401);
+        }
+        try {
+            $this->requireRole($token, 'admin');
+        } catch (RuntimeException $e) {
+            return ApiResponse::error($e->getMessage(), 403);
+        }
+
+        $count = LeaveRequest::markOverdue();
+
+        $log = date('Y-m-d H:i:s') . " [system] Checked overdue leaves: $count marked as overdue\n";
+        file_put_contents(__DIR__ . '/../../storage/logs/kpp.log', $log, FILE_APPEND);
+
+        return ApiResponse::success([
+            'overdue_count' => $count,
+            'message' => "Обновлено $count заявлений со статусом overdue"
+        ]);
+    }
 }

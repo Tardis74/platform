@@ -509,4 +509,90 @@ class StudentController extends BaseController
 
         return ApiResponse::success($docs);
     }
+
+    /**
+     * Подача заявления на выход учеником
+     */
+    public function leaveRequestCreate(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) {
+            return ApiResponse::error('Token required.', 401);
+        }
+        try {
+            $this->requireRole($token, 'student');
+        } catch (RuntimeException $e) {
+            return ApiResponse::error($e->getMessage(), 403);
+        }
+
+        $user = $this->getCurrentUser($token);
+        if (!$user) {
+            return ApiResponse::error('User not found.', 404);
+        }
+
+        $student = Student::findByUserId($user['id']);
+        if (!$student || $student['status'] !== 'active') {
+            return ApiResponse::error('Student not found or inactive.', 404);
+        }
+        if (!$student['is_dormitory']) {
+            return ApiResponse::error('Ученик не проживает в общежитии.', 400);
+        }
+
+        if (empty($payload['start_time']) || empty($payload['end_time'])) {
+            return ApiResponse::error('start_time and end_time are required.', 400);
+        }
+        if (!strtotime($payload['start_time']) || !strtotime($payload['end_time'])) {
+            return ApiResponse::error('Invalid date format. Use YYYY-MM-DD HH:MM:SS.', 400);
+        }
+
+        $data = [
+            'student_id' => $student['id'],
+            'parent_id'  => null,
+            'start_time' => $payload['start_time'],
+            'end_time'   => $payload['end_time'],
+            'status'     => 'pending',
+            'created_by' => $user['id'],
+        ];
+
+        $requestId = LeaveRequest::create($data);
+
+        $log = date('Y-m-d H:i:s') . " Student {$user['id']} created leave request $requestId\n";
+        file_put_contents(__DIR__ . '/../../storage/logs/kpp.log', $log, FILE_APPEND);
+
+        return ApiResponse::success([
+            'request_id' => $requestId,
+            'status' => 'pending',
+            'message' => 'Заявление отправлено воспитателю',
+        ]);
+    }
+
+    /**
+     * Список своих заявлений
+     */
+    public function leaveRequestList(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) {
+            return ApiResponse::error('Token required.', 401);
+        }
+        try {
+            $this->requireRole($token, 'student');
+        } catch (RuntimeException $e) {
+            return ApiResponse::error($e->getMessage(), 403);
+        }
+
+        $user = $this->getCurrentUser($token);
+        if (!$user) {
+            return ApiResponse::error('User not found.', 404);
+        }
+
+        $student = Student::findByUserId($user['id']);
+        if (!$student) {
+            return ApiResponse::error('Student not found.', 404);
+        }
+
+        $status = $payload['status'] ?? null;
+        $requests = LeaveRequest::getByStudent($student['id'], $status);
+        return ApiResponse::success($requests);
+    }
 }

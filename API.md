@@ -1433,6 +1433,88 @@ URL: /api.php?method=system.checkExpiredDocuments
 
 Срок действия (expiry_date) – опциональный атрибут; при его наступлении документ автоматически переводится в статус expired.
 
+##Модуль «КПП и выходы из общежития»
+
+Родительские методы (в ParentController)
+
+###parent.leaveRequest.create – подача заявления на выход родителем.
+Входные параметры: student_id (int, обязательное), start_time (string, YYYY-MM-DD HH:MM:SS, обязательное), end_time (string, YYYY-MM-DD HH:MM:SS, обязательное), comment (string, опционально).
+Логика: проверяет, что ученик проживает в общежитии и привязан к родителю, создаёт заявление со статусом pending.
+Ответ: { success: true, data: { request_id, status: 'pending', message: 'Заявление отправлено воспитателю' } }
+
+###parent.leaveRequest.list – список заявлений для своих детей.
+Входные параметры: status (string, опционально, фильтр по статусу).
+Ответ: массив заявлений с полями id, student_name, class_name, start_time, end_time, status, created_at и др.
+
+##Студенческие методы (в StudentController)
+
+###student.leaveRequest.create – ученик подаёт заявление (если ему разрешено).
+Параметры аналогичны parent.leaveRequest.create, но проверяется, что текущий пользователь – сам ученик.
+Ответ: аналогичен.
+
+###student.leaveRequest.list – список своих заявлений с фильтрацией по статусу (параметр status опционально).
+Ответ: массив заявлений.
+
+Методы воспитателя (в EducatorController)
+
+###educator.leaveRequest.getPending – список заявлений на рассмотрении.
+Входные параметры: date_from (string, опционально), date_to (string, опционально) – фильтры по дате начала.
+Ответ: массив заявлений со статусом pending, включая student_name, class_name, created_by_name, start_time, end_time, created_at.
+
+###educator.leaveRequest.approve – подтверждение заявления.
+Входные параметры: request_id (int, обязательное), new_end_time (string, опционально – скорректировать время окончания).
+Логика: проверяет статус pending, при необходимости обновляет end_time, генерирует QR-код (request_id|HMAC), статус → approved.
+Ответ: { success: true, data: { request_id, status: 'approved', qr_code: '...' } }
+
+###educator.leaveRequest.reject – отклонение заявления.
+Входные параметры: request_id (int, обязательное), reason (string, обязательное).
+Ответ: { success: true, data: { request_id, status: 'rejected' } }
+
+###educator.leaveRequest.create – создание выхода без заявления (срочный случай).
+Входные параметры: student_id (int, обязательное), start_time (string, опционально, по умолчанию сейчас), end_time (string, опционально, по умолчанию +2 часа).
+Логика: создаёт заявление со статусом approved, генерирует QR.
+Ответ: { success: true, data: { request_id, status: 'approved', qr_code: '...' } }
+
+##Методы для сотрудников КПП (в KppController)
+
+###kpp.getTodayRequests – список подтверждённых заявлений на сегодня.
+Без параметров. Возвращает массив заявлений со статусом approved или exited, у которых start_time <= сегодня и end_time >= сегодня. Включает фото ученика (если есть), ФИО, время начала и окончания.
+
+###kpp.scan – обработка сканирования QR-кода.
+Входные параметры: qr_data (string, обязательное) – строка с QR.
+Логика: парсит request_id|hmac, проверяет подпись (секрет из .env), находит заявление, проверяет статус (approved или exited) и попадание в интервал start_time..end_time.
+Ответ: { success: true, data: { request_id, student: { id, full_name, photo_url }, start_time, end_time, current_status } }
+
+###kpp.exit – фиксация выхода.
+Входные параметры: request_id (int, обязательное).
+Логика: проверяет статус approved, обновляет статус на exited, фиксирует время выхода, записывает событие в kpp_logs.
+Ответ: { success: true, message: 'Выход зафиксирован' }
+
+###kpp.entry – фиксация возврата.
+Входные параметры: request_id (int, обязательное).
+Логика: проверяет статус exited или approved, обновляет статус на returned, фиксирует время возврата, записывает событие в kpp_logs.
+Ответ: { success: true, message: 'Возврат зафиксирован' }
+
+###kpp.search – поиск ученика по фамилии (если QR не читается).
+Входные параметры: query (string, обязательное) – часть ФИО.
+Ответ: массив активных заявлений (статус approved или exited) с фото и ФИО ученика.
+
+##Системные методы (в SystemController)
+
+###system.checkOverdueLeaves – проверка просроченных возвратов.
+Вызывается администратором или по крону. Находит заявления со статусом exited или approved, у которых end_time < NOW(), обновляет статус на overdue, записывает в лог.
+Ответ: { success: true, data: { overdue_count, message } }
+
+Важные замечания по безопасности и работе:
+Все методы требуют JWT-аутентификации, кроме публичных (auth.login, auth.refresh, auth.register, student.login).
+Родитель может подавать заявления только для своих детей.
+Ученик может подавать заявления только для себя.
+Воспитатель имеет полный доступ к модерации (роли admin, moderator, teacher).
+Сотрудник КПП имеет доступ только к чтению и фиксации (роль kpp или выше).
+QR-код формируется как строка "request_id|HMAC", где HMAC вычисляется с использованием секрета QR_SECRET из .env. При сканировании подпись проверяется, чтобы исключить подделку.
+Все действия логируются в таблицу kpp_logs и в файл storage/logs/kpp.log.
+Для корректной работы необходимо выполнить SQL-скрипты создания таблиц leave_requests и kpp_logs, а также добавить константу QR_SECRET в .env.
+
 ##Коды ошибок (общие)
 
 400 – Неверный запрос (не хватает полей, неверный формат и т.п.)

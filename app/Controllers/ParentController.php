@@ -551,4 +551,106 @@ class ParentController extends BaseController
 
         return ApiResponse::success($consents);
     }
+
+    /**
+     * Подача заявления на выход родителем
+     */
+    public function leaveRequestCreate(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) {
+            return ApiResponse::error('Token required.', 401);
+        }
+        try {
+            $this->requireRole($token, 'parent');
+        } catch (RuntimeException $e) {
+            return ApiResponse::error($e->getMessage(), 403);
+        }
+
+        $user = $this->getCurrentUser($token);
+        if (!$user) {
+            return ApiResponse::error('User not found.', 404);
+        }
+
+        $parent = $db->fetch("SELECT id FROM parents WHERE user_id = :user_id", ['user_id' => $user['id']]);
+        if (!$parent) {
+            return ApiResponse::error('Parent profile not found.', 404);
+        }
+        $parentId = $parent['id'];
+
+        $studentId = (int)($payload['student_id'] ?? 0);
+        if ($studentId <= 0) {
+            return ApiResponse::error('student_id is required.', 400);
+        }
+
+        // Проверка, что ребёнок привязан
+        $link = $db->fetch("SELECT 1 FROM parent_student WHERE parent_id = :parent_id AND student_id = :student_id",
+            ['parent_id' => $parentId, 'student_id' => $studentId]);
+        if (!$link) {
+            return ApiResponse::error('This student is not linked to you.', 403);
+        }
+
+        $student = Student::find($studentId);
+        if (!$student || !$student['is_dormitory']) {
+            return ApiResponse::error('Ученик не проживает в общежитии.', 400);
+        }
+
+        if (empty($payload['start_time']) || empty($payload['end_time'])) {
+            return ApiResponse::error('start_time and end_time are required.', 400);
+        }
+        if (!strtotime($payload['start_time']) || !strtotime($payload['end_time'])) {
+            return ApiResponse::error('Invalid date format. Use YYYY-MM-DD HH:MM:SS.', 400);
+        }
+
+        $data = [
+            'student_id' => $studentId,
+            'parent_id'  => $parentId,
+            'start_time' => $payload['start_time'],
+            'end_time'   => $payload['end_time'],
+            'status'     => 'pending',
+            'created_by' => $user['id'],
+        ];
+
+        $requestId = LeaveRequest::create($data);
+
+        $log = date('Y-m-d H:i:s') . " Parent {$user['id']} created leave request $requestId for student $studentId\n";
+        file_put_contents(__DIR__ . '/../../storage/logs/kpp.log', $log, FILE_APPEND);
+
+        return ApiResponse::success([
+            'request_id' => $requestId,
+            'status' => 'pending',
+            'message' => 'Заявление отправлено воспитателю',
+        ]);
+    }
+
+    /**
+     * Список заявлений для своих детей
+     */
+    public function leaveRequestList(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) {
+            return ApiResponse::error('Token required.', 401);
+        }
+        try {
+            $this->requireRole($token, 'parent');
+        } catch (RuntimeException $e) {
+            return ApiResponse::error($e->getMessage(), 403);
+        }
+
+        $user = $this->getCurrentUser($token);
+        if (!$user) {
+            return ApiResponse::error('User not found.', 404);
+        }
+
+        $parent = $db->fetch("SELECT id FROM parents WHERE user_id = :user_id", ['user_id' => $user['id']]);
+        if (!$parent) {
+            return ApiResponse::error('Parent profile not found.', 404);
+        }
+        $parentId = $parent['id'];
+
+        $status = $payload['status'] ?? null;
+        $requests = LeaveRequest::getByParent($parentId, $status);
+        return ApiResponse::success($requests);
+    }
 }
