@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Хост: 127.0.0.1
--- Время создания: Авг 25 2026 г., 15:37
+-- Время создания: Авг 25 2026 г., 16:09
 -- Версия сервера: 10.4.27-MariaDB
 -- Версия PHP: 7.4.33
 
@@ -212,7 +212,10 @@ CREATE TABLE `students` (
   `class_id` int(10) UNSIGNED DEFAULT NULL,
   `total_points` int(11) NOT NULL DEFAULT 0,
   `birth_date` date DEFAULT NULL,
-  `is_dormitory` tinyint(1) NOT NULL DEFAULT 0
+  `is_dormitory` tinyint(1) NOT NULL DEFAULT 0,
+  `status` enum('awaiting_confirmation','active','rejected') NOT NULL DEFAULT 'awaiting_confirmation',
+  `rejection_reason` text DEFAULT NULL,
+  `snils_masked` varchar(14) DEFAULT NULL COMMENT 'маскированный СНИЛС для отображения (первые 3 и последние 2)'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
