@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Хост: 127.0.0.1
--- Время создания: Авг 25 2026 г., 18:09
+-- Время создания: Авг 25 2026 г., 18:40
 -- Версия сервера: 10.4.27-MariaDB
 -- Версия PHP: 7.4.33
 
@@ -107,6 +107,63 @@ CREATE TABLE `classes` (
   `year` year(4) NOT NULL,
   `teacher_id` int(10) UNSIGNED DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Структура таблицы `consents`
+--
+
+CREATE TABLE `consents` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `user_id` int(10) UNSIGNED NOT NULL,
+  `student_id` int(10) UNSIGNED NOT NULL,
+  `type` enum('general','event','data_processing') NOT NULL,
+  `version` varchar(20) NOT NULL,
+  `status` enum('active','revoked') NOT NULL DEFAULT 'active',
+  `given_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `revoked_at` timestamp NULL DEFAULT NULL,
+  `ip_address` varchar(45) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Структура таблицы `documents`
+--
+
+CREATE TABLE `documents` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `student_id` int(10) UNSIGNED NOT NULL,
+  `template_id` int(10) UNSIGNED DEFAULT NULL,
+  `event_id` int(10) UNSIGNED DEFAULT NULL,
+  `uploaded_by` int(10) UNSIGNED NOT NULL,
+  `file_path` varchar(255) DEFAULT NULL,
+  `signature_data` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`signature_data`)),
+  `status` enum('pending','approved','rejected','expired') NOT NULL DEFAULT 'pending',
+  `moderator_comment` text DEFAULT NULL,
+  `expiry_date` date DEFAULT NULL,
+  `version` int(10) UNSIGNED NOT NULL DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Структура таблицы `document_templates`
+--
+
+CREATE TABLE `document_templates` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `name` varchar(255) NOT NULL,
+  `description` text DEFAULT NULL,
+  `content` text NOT NULL,
+  `signature_level` enum('simple','sms','goskey') NOT NULL DEFAULT 'simple',
+  `requires_file` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -396,6 +453,33 @@ ALTER TABLE `classes`
   ADD KEY `idx_teacher_id` (`teacher_id`);
 
 --
+-- Индексы таблицы `consents`
+--
+ALTER TABLE `consents`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `user_id` (`user_id`),
+  ADD KEY `student_id` (`student_id`),
+  ADD KEY `status` (`status`);
+
+--
+-- Индексы таблицы `documents`
+--
+ALTER TABLE `documents`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `student_id` (`student_id`),
+  ADD KEY `template_id` (`template_id`),
+  ADD KEY `event_id` (`event_id`),
+  ADD KEY `status` (`status`),
+  ADD KEY `expiry_date` (`expiry_date`),
+  ADD KEY `fk_document_uploader` (`uploaded_by`);
+
+--
+-- Индексы таблицы `document_templates`
+--
+ALTER TABLE `document_templates`
+  ADD PRIMARY KEY (`id`);
+
+--
 -- Индексы таблицы `events`
 --
 ALTER TABLE `events`
@@ -545,6 +629,24 @@ ALTER TABLE `classes`
   MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
+-- AUTO_INCREMENT для таблицы `consents`
+--
+ALTER TABLE `consents`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT для таблицы `documents`
+--
+ALTER TABLE `documents`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT для таблицы `document_templates`
+--
+ALTER TABLE `document_templates`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT для таблицы `events`
 --
 ALTER TABLE `events`
@@ -626,6 +728,22 @@ ALTER TABLE `achievements`
 --
 ALTER TABLE `classes`
   ADD CONSTRAINT `fk_classes_teacher_id` FOREIGN KEY (`teacher_id`) REFERENCES `teachers` (`id`) ON DELETE SET NULL;
+
+--
+-- Ограничения внешнего ключа таблицы `consents`
+--
+ALTER TABLE `consents`
+  ADD CONSTRAINT `fk_consent_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_consent_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+
+--
+-- Ограничения внешнего ключа таблицы `documents`
+--
+ALTER TABLE `documents`
+  ADD CONSTRAINT `fk_document_event` FOREIGN KEY (`event_id`) REFERENCES `events` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_document_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_document_template` FOREIGN KEY (`template_id`) REFERENCES `document_templates` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_document_uploader` FOREIGN KEY (`uploaded_by`) REFERENCES `users` (`id`);
 
 --
 -- Ограничения внешнего ключа таблицы `events`

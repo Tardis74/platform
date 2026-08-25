@@ -320,4 +320,235 @@ class ParentController extends BaseController
         $registrations = $db->fetchAll($sql, $params);
         return ApiResponse::success($registrations);
     }
+
+    // ========== Документы ==========
+
+    public function uploadDocument(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) return ApiResponse::error('Token required.', 401);
+        try { $this->requireRole($token, 'parent'); } catch (\RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
+
+        $user = $this->getCurrentUser($token);
+        $parent = $db->fetch("SELECT id FROM parents WHERE user_id = :user_id", ['user_id' => $user['id']]);
+        if (!$parent) return ApiResponse::error('Parent profile not found.', 404);
+        $parentId = $parent['id'];
+
+        $studentId = (int)($payload['student_id'] ?? 0);
+        if ($studentId <= 0) return ApiResponse::error('student_id is required.', 400);
+
+        // Проверка, что ребёнок принадлежит родителю
+        $link = $db->fetch("SELECT 1 FROM parent_student WHERE parent_id = :parent_id AND student_id = :student_id",
+            ['parent_id' => $parentId, 'student_id' => $studentId]);
+        if (!$link) return ApiResponse::error('This student is not linked to you.', 403);
+
+        // Проверка шаблона, если указан
+        $templateId = isset($payload['template_id']) ? (int)$payload['template_id'] : null;
+        $template = null;
+        if ($templateId) {
+            $template = \App\Models\DocumentTemplate::find($templateId);
+            if (!$template) return ApiResponse::error('Template not found.', 404);
+        }
+
+        // Обработка файла
+        $filePath = null;
+        $signatureData = null;
+        $requiresFile = $template ? (bool)$template['requires_file'] : true; // если нет шаблона – всегда требуется файл
+
+        if ($requiresFile) {
+            if (!isset($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
+                return ApiResponse::error('File upload required.', 400);
+            }
+            $filePath = \App\Helpers\FileHelper::saveDocument($_FILES['file'], $studentId);
+            if (!$filePath) return ApiResponse::error('Invalid file or size. Allowed: pdf, jpg, png, doc, docx, odt, max 10MB.', 400);
+        } else {
+            // Простая подпись (галочка)
+            if (isset($payload['signature']) && $payload['signature'] === true) {
+                $signatureData = json_encode(['confirmed' => true, 'date' => date('Y-m-d H:i:s')]);
+            } else {
+                return ApiResponse::error('Signature required for this template.', 400);
+            }
+        }
+
+        $eventId = isset($payload['event_id']) ? (int)$payload['event_id'] : null;
+        $expiryDate = $payload['expiry_date'] ?? null;
+        if ($expiryDate && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $expiryDate)) {
+            return ApiResponse::error('Invalid expiry_date format. Use YYYY-MM-DD.', 400);
+        }
+
+        // Создание документа
+        $docData = [
+            'student_id' => $studentId,
+            'template_id' => $templateId,
+            'event_id' => $eventId,
+            'uploaded_by' => $user['id'],
+            'file_path' => $filePath,
+            'signature_data' => $signatureData,
+            'status' => 'pending',
+            'expiry_date' => $expiryDate,
+            'version' => 1,
+        ];
+
+        try {
+            $docId = \App\Models\Document::create($docData);
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to upload document: ' . $e->getMessage(), 500);
+        }
+
+        $log = date('Y-m-d H:i:s') . " [user_id: {$user['id']}] Загружен документ ID $docId для студента $studentId\n";
+        file_put_contents(__DIR__ . '/../../storage/logs/documents.log', $log, FILE_APPEND);
+
+        return ApiResponse::success([
+            'document_id' => $docId,
+            'status' => 'pending',
+            'message' => 'Документ отправлен на проверку'
+        ]);
+    }
+
+    public function getDocuments(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) return ApiResponse::error('Token required.', 401);
+        try { $this->requireRole($token, 'parent'); } catch (\RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
+
+        $user = $this->getCurrentUser($token);
+        $parent = $db->fetch("SELECT id FROM parents WHERE user_id = :user_id", ['user_id' => $user['id']]);
+        if (!$parent) return ApiResponse::error('Parent profile not found.', 404);
+        $parentId = $parent['id'];
+
+        $studentId = isset($payload['student_id']) ? (int)$payload['student_id'] : null;
+        $status = $payload['status'] ?? null;
+
+        // Получаем детей родителя
+        $children = $db->fetchAll("SELECT student_id FROM parent_student WHERE parent_id = :parent_id", ['parent_id' => $parentId]);
+        $studentIds = array_column($children, 'student_id');
+        if (empty($studentIds)) return ApiResponse::success([]);
+
+        // Если указан конкретный ребёнок, проверяем принадлежность
+        if ($studentId && !in_array($studentId, $studentIds)) {
+            return ApiResponse::error('Access denied to this student.', 403);
+        }
+        if ($studentId) $studentIds = [$studentId];
+
+        // Собираем документы для всех детей
+        $documents = [];
+        foreach ($studentIds as $sid) {
+            $docs = \App\Models\Document::getByStudent($sid, $status);
+            foreach ($docs as &$d) {
+                $d['file_url'] = $d['file_path'] ? '/api.php?method=document.download&id=' . $d['id'] : null;
+            }
+            $documents = array_merge($documents, $docs);
+        }
+        usort($documents, fn($a, $b) => strtotime($b['created_at']) - strtotime($a['created_at']));
+
+        return ApiResponse::success($documents);
+    }
+
+    // ========== Согласия ==========
+
+    public function giveConsent(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) return ApiResponse::error('Token required.', 401);
+        try { $this->requireRole($token, 'parent'); } catch (\RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
+
+        $user = $this->getCurrentUser($token);
+        $parent = $db->fetch("SELECT id FROM parents WHERE user_id = :user_id", ['user_id' => $user['id']]);
+        if (!$parent) return ApiResponse::error('Parent profile not found.', 404);
+        $parentId = $parent['id'];
+
+        $studentId = (int)($payload['student_id'] ?? 0);
+        if ($studentId <= 0) return ApiResponse::error('student_id is required.', 400);
+
+        $link = $db->fetch("SELECT 1 FROM parent_student WHERE parent_id = :parent_id AND student_id = :student_id",
+            ['parent_id' => $parentId, 'student_id' => $studentId]);
+        if (!$link) return ApiResponse::error('This student is not linked to you.', 403);
+
+        $type = $payload['type'] ?? null;
+        if (!in_array($type, ['general', 'event', 'data_processing'])) {
+            return ApiResponse::error('Invalid consent type. Allowed: general, event, data_processing.', 400);
+        }
+        if (empty($payload['version'])) return ApiResponse::error('version is required.', 400);
+
+        // Деактивируем предыдущее согласие того же типа
+        \App\Models\Consent::deactivatePrevious($studentId, $type);
+
+        $data = [
+            'user_id' => $user['id'],
+            'student_id' => $studentId,
+            'type' => $type,
+            'version' => $payload['version'],
+            'status' => 'active',
+            'ip_address' => $_SERVER['REMOTE_ADDR'] ?? null,
+        ];
+        try {
+            $consentId = \App\Models\Consent::create($data);
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to save consent: ' . $e->getMessage(), 500);
+        }
+
+        $log = date('Y-m-d H:i:s') . " [user_id: {$user['id']}] Дано согласие ID $consentId (type $type) для студента $studentId\n";
+        file_put_contents(__DIR__ . '/../../storage/logs/documents.log', $log, FILE_APPEND);
+
+        return ApiResponse::success(['consent_id' => $consentId, 'status' => 'active']);
+    }
+
+    public function revokeConsent(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) return ApiResponse::error('Token required.', 401);
+        try { $this->requireRole($token, 'parent'); } catch (\RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
+
+        $user = $this->getCurrentUser($token);
+        $consentId = (int)($payload['consent_id'] ?? 0);
+        if ($consentId <= 0) return ApiResponse::error('consent_id is required.', 400);
+
+        $consent = \App\Models\Consent::find($consentId);
+        if (!$consent) return ApiResponse::error('Consent not found.', 404);
+        if ((int)$consent['user_id'] !== (int)$user['id']) return ApiResponse::error('Access denied.', 403);
+        if ($consent['status'] === 'revoked') return ApiResponse::error('Consent already revoked.', 409);
+
+        try {
+            \App\Models\Consent::revoke($consentId, $_SERVER['REMOTE_ADDR'] ?? null);
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to revoke consent: ' . $e->getMessage(), 500);
+        }
+
+        $log = date('Y-m-d H:i:s') . " [user_id: {$user['id']}] Отозвано согласие ID $consentId\n";
+        file_put_contents(__DIR__ . '/../../storage/logs/documents.log', $log, FILE_APPEND);
+
+        return ApiResponse::success(['message' => 'Согласие отозвано']);
+    }
+
+    public function getConsents(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) return ApiResponse::error('Token required.', 401);
+        try { $this->requireRole($token, 'parent'); } catch (\RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
+
+        $user = $this->getCurrentUser($token);
+        $parent = $db->fetch("SELECT id FROM parents WHERE user_id = :user_id", ['user_id' => $user['id']]);
+        if (!$parent) return ApiResponse::error('Parent profile not found.', 404);
+        $parentId = $parent['id'];
+
+        $studentId = isset($payload['student_id']) ? (int)$payload['student_id'] : null;
+        $type = $payload['type'] ?? null;
+
+        $children = $db->fetchAll("SELECT student_id FROM parent_student WHERE parent_id = :parent_id", ['parent_id' => $parentId]);
+        $studentIds = array_column($children, 'student_id');
+        if (empty($studentIds)) return ApiResponse::success([]);
+
+        if ($studentId && !in_array($studentId, $studentIds)) {
+            return ApiResponse::error('Access denied to this student.', 403);
+        }
+        if ($studentId) $studentIds = [$studentId];
+
+        $consents = [];
+        foreach ($studentIds as $sid) {
+            $consents = array_merge($consents, \App\Models\Consent::getByStudent($sid, $type));
+        }
+        usort($consents, fn($a, $b) => strtotime($b['given_at']) - strtotime($a['given_at']));
+
+        return ApiResponse::success($consents);
+    }
 }

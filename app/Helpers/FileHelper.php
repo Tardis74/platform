@@ -5,6 +5,7 @@ namespace App\Helpers;
 class FileHelper
 {
     private const UPLOAD_DIR = __DIR__ . '/../../storage/uploads/achievements/';
+    private const DOCUMENT_UPLOAD_DIR = __DIR__ . '/../../storage/uploads/documents/';
 
     /**
      * Сохраняет загруженный файл в защищённую директорию.
@@ -62,5 +63,34 @@ class FileHelper
     public static function fileExists(string $relativePath): bool
     {
         return file_exists(self::getFilePath($relativePath));
+    }
+
+
+    /**
+     * Сохраняет загруженный файл документа.
+     */
+    public static function saveDocument(array $file, int $studentId): ?string
+    {
+        if ($file['error'] !== UPLOAD_ERR_OK) return null;
+
+        $allowed = ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'odt'];
+        $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        if (!in_array($ext, $allowed)) return null;
+        if ($file['size'] > 10 * 1024 * 1024) return null;
+
+        if (!is_dir(self::DOCUMENT_UPLOAD_DIR)) {
+            mkdir(self::DOCUMENT_UPLOAD_DIR, 0755, true);
+        }
+
+        $filename = uniqid() . '_' . time() . '.' . $ext;
+        $destination = self::DOCUMENT_UPLOAD_DIR . $filename;
+        if (!move_uploaded_file($file['tmp_name'], $destination)) return null;
+
+        return $filename;
+    }
+
+    public static function getDocumentPath(string $relativePath): string
+    {
+        return self::DOCUMENT_UPLOAD_DIR . $relativePath;
     }
 }

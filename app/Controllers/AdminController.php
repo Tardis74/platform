@@ -413,4 +413,104 @@ class AdminController extends BaseController
 
         return ApiResponse::success(['message' => 'Тег удалён']);
     }
+
+    // ========== Управление шаблонами документов ==========
+
+    public function templateList(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) return ApiResponse::error('Token required.', 401);
+        try { $this->requireRole($token, 'admin'); } catch (\RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
+        return ApiResponse::success(\App\Models\DocumentTemplate::all());
+    }
+
+    public function templateCreate(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) return ApiResponse::error('Token required.', 401);
+        try { $this->requireRole($token, 'admin'); } catch (\RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
+
+        if (empty($payload['name']) || empty($payload['content'])) {
+            return ApiResponse::error('name and content are required.', 400);
+        }
+
+        $data = [
+            'name' => $payload['name'],
+            'description' => $payload['description'] ?? null,
+            'content' => $payload['content'],
+            'signature_level' => $payload['signature_level'] ?? 'simple',
+            'requires_file' => isset($payload['requires_file']) ? (bool)$payload['requires_file'] : true,
+        ];
+
+        try {
+            $id = \App\Models\DocumentTemplate::create($data);
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to create template: ' . $e->getMessage(), 500);
+        }
+
+        $user = $this->getCurrentUser($token);
+        $log = date('Y-m-d H:i:s') . " [user_id: {$user['id']}] Создан шаблон ID $id\n";
+        file_put_contents(__DIR__ . '/../../storage/logs/documents.log', $log, FILE_APPEND);
+
+        return ApiResponse::success(['template_id' => $id, 'message' => 'Шаблон создан']);
+    }
+
+    public function templateUpdate(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) return ApiResponse::error('Token required.', 401);
+        try { $this->requireRole($token, 'admin'); } catch (\RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
+
+        $id = (int)($payload['id'] ?? 0);
+        if ($id <= 0) return ApiResponse::error('id is required.', 400);
+
+        $template = \App\Models\DocumentTemplate::find($id);
+        if (!$template) return ApiResponse::error('Template not found.', 404);
+
+        $updatable = ['name', 'description', 'content', 'signature_level', 'requires_file'];
+        $data = [];
+        foreach ($updatable as $field) {
+            if (array_key_exists($field, $payload)) {
+                $data[$field] = $payload[$field];
+            }
+        }
+        if (empty($data)) return ApiResponse::error('No fields to update.', 400);
+
+        try {
+            \App\Models\DocumentTemplate::update($id, $data);
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to update template: ' . $e->getMessage(), 500);
+        }
+
+        $user = $this->getCurrentUser($token);
+        $log = date('Y-m-d H:i:s') . " [user_id: {$user['id']}] Обновлён шаблон ID $id\n";
+        file_put_contents(__DIR__ . '/../../storage/logs/documents.log', $log, FILE_APPEND);
+
+        return ApiResponse::success(['message' => 'Шаблон обновлён']);
+    }
+
+    public function templateDelete(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) return ApiResponse::error('Token required.', 401);
+        try { $this->requireRole($token, 'admin'); } catch (\RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
+
+        $id = (int)($payload['id'] ?? 0);
+        if ($id <= 0) return ApiResponse::error('id is required.', 400);
+
+        $template = \App\Models\DocumentTemplate::find($id);
+        if (!$template) return ApiResponse::error('Template not found.', 404);
+
+        try {
+            \App\Models\DocumentTemplate::delete($id);
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to delete template: ' . $e->getMessage(), 500);
+        }
+
+        $user = $this->getCurrentUser($token);
+        $log = date('Y-m-d H:i:s') . " [user_id: {$user['id']}] Удалён шаблон ID $id\n";
+        file_put_contents(__DIR__ . '/../../storage/logs/documents.log', $log, FILE_APPEND);
+
+        return ApiResponse::success(['message' => 'Шаблон удалён']);
+    }
 }

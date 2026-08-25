@@ -417,4 +417,96 @@ class StudentController extends BaseController
         $registrations = \App\Models\EventRegistration::getByStudent($student['id'], $filters);
         return ApiResponse::success($registrations);
     }
+
+    // ========== Документы ученика ==========
+
+    public function uploadDocument(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) return ApiResponse::error('Token required.', 401);
+        try { $this->requireRole($token, 'student'); } catch (\RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
+
+        $user = $this->getCurrentUser($token);
+        $student = \App\Models\Student::findByUserId($user['id']);
+        if (!$student || $student['status'] !== 'active') {
+            return ApiResponse::error('Student not found or inactive.', 404);
+        }
+
+        $templateId = isset($payload['template_id']) ? (int)$payload['template_id'] : null;
+        $template = null;
+        if ($templateId) {
+            $template = \App\Models\DocumentTemplate::find($templateId);
+            if (!$template) return ApiResponse::error('Template not found.', 404);
+        }
+
+        $filePath = null;
+        $signatureData = null;
+        $requiresFile = $template ? (bool)$template['requires_file'] : true;
+
+        if ($requiresFile) {
+            if (!isset($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
+                return ApiResponse::error('File upload required.', 400);
+            }
+            $filePath = \App\Helpers\FileHelper::saveDocument($_FILES['file'], $student['id']);
+            if (!$filePath) return ApiResponse::error('Invalid file or size.', 400);
+        } else {
+            if (isset($payload['signature']) && $payload['signature'] === true) {
+                $signatureData = json_encode(['confirmed' => true, 'date' => date('Y-m-d H:i:s')]);
+            } else {
+                return ApiResponse::error('Signature required.', 400);
+            }
+        }
+
+        $eventId = isset($payload['event_id']) ? (int)$payload['event_id'] : null;
+        $expiryDate = $payload['expiry_date'] ?? null;
+        if ($expiryDate && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $expiryDate)) {
+            return ApiResponse::error('Invalid expiry_date format.', 400);
+        }
+
+        $docData = [
+            'student_id' => $student['id'],
+            'template_id' => $templateId,
+            'event_id' => $eventId,
+            'uploaded_by' => $user['id'],
+            'file_path' => $filePath,
+            'signature_data' => $signatureData,
+            'status' => 'pending',
+            'expiry_date' => $expiryDate,
+            'version' => 1,
+        ];
+
+        try {
+            $docId = \App\Models\Document::create($docData);
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to upload document: ' . $e->getMessage(), 500);
+        }
+
+        $log = date('Y-m-d H:i:s') . " [user_id: {$user['id']}] Ученик загрузил документ ID $docId\n";
+        file_put_contents(__DIR__ . '/../../storage/logs/documents.log', $log, FILE_APPEND);
+
+        return ApiResponse::success([
+            'document_id' => $docId,
+            'status' => 'pending',
+            'message' => 'Документ отправлен на проверку'
+        ]);
+    }
+
+    public function getDocuments(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) return ApiResponse::error('Token required.', 401);
+        try { $this->requireRole($token, 'student'); } catch (\RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
+
+        $user = $this->getCurrentUser($token);
+        $student = \App\Models\Student::findByUserId($user['id']);
+        if (!$student) return ApiResponse::error('Student not found.', 404);
+
+        $status = $payload['status'] ?? null;
+        $docs = \App\Models\Document::getByStudent($student['id'], $status);
+        foreach ($docs as &$d) {
+            $d['file_url'] = $d['file_path'] ? '/api.php?method=document.download&id=' . $d['id'] : null;
+        }
+
+        return ApiResponse::success($docs);
+    }
 }

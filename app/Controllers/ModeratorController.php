@@ -306,4 +306,107 @@ class ModeratorController extends BaseController
             'status' => 'rejected',
         ]);
     }
+
+    // ========== Модерация документов ==========
+
+    public function getPendingDocuments(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) return ApiResponse::error('Token required.', 401);
+        try { $this->requireRole($token, ['admin', 'moderator', 'teacher']); } catch (\RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
+
+        $user = $this->getCurrentUser($token);
+        $classId = null;
+
+        if ($user['role'] === 'teacher') {
+            $teacher = $db->fetch("SELECT class_id FROM teachers WHERE user_id = :user_id", ['user_id' => $user['id']]);
+            if (!$teacher || !$teacher['class_id']) {
+                return ApiResponse::error('У вас нет привязанного класса.', 404);
+            }
+            $classId = (int)$teacher['class_id'];
+        }
+
+        $documents = \App\Models\Document::getPending($classId);
+        return ApiResponse::success($documents);
+    }
+
+    public function confirmDocument(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) return ApiResponse::error('Token required.', 401);
+        try { $this->requireRole($token, ['admin', 'moderator', 'teacher']); } catch (\RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
+
+        $user = $this->getCurrentUser($token);
+        $documentId = (int)($payload['document_id'] ?? 0);
+        if ($documentId <= 0) return ApiResponse::error('document_id is required.', 400);
+
+        $document = \App\Models\Document::find($documentId);
+        if (!$document) return ApiResponse::error('Document not found.', 404);
+        if ($document['status'] !== 'pending') return ApiResponse::error('Document is not pending.', 409);
+
+        // Для учителя проверяем класс
+        if ($user['role'] === 'teacher') {
+            $teacher = $db->fetch("SELECT class_id FROM teachers WHERE user_id = :user_id", ['user_id' => $user['id']]);
+            if (!$teacher || !$teacher['class_id']) {
+                return ApiResponse::error('У вас нет привязанного класса.', 404);
+            }
+            $student = \App\Models\Student::find($document['student_id']);
+            if (!$student || (int)$student['class_id'] !== (int)$teacher['class_id']) {
+                return ApiResponse::error('Этот документ не ученика вашего класса.', 403);
+            }
+        }
+
+        $comment = $payload['comment'] ?? null;
+        try {
+            \App\Models\Document::updateStatus($documentId, 'approved', $comment);
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to confirm document: ' . $e->getMessage(), 500);
+        }
+
+        $log = date('Y-m-d H:i:s') . " [user_id: {$user['id']}] Подтверждён документ ID $documentId\n";
+        file_put_contents(__DIR__ . '/../../storage/logs/documents.log', $log, FILE_APPEND);
+
+        return ApiResponse::success(['document_id' => $documentId, 'status' => 'approved']);
+    }
+
+    public function rejectDocument(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) return ApiResponse::error('Token required.', 401);
+        try { $this->requireRole($token, ['admin', 'moderator', 'teacher']); } catch (\RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
+
+        $user = $this->getCurrentUser($token);
+        $documentId = (int)($payload['document_id'] ?? 0);
+        if ($documentId <= 0) return ApiResponse::error('document_id is required.', 400);
+
+        $comment = $payload['comment'] ?? null;
+        if (empty($comment)) return ApiResponse::error('Comment (reason) is required for rejection.', 400);
+
+        $document = \App\Models\Document::find($documentId);
+        if (!$document) return ApiResponse::error('Document not found.', 404);
+        if ($document['status'] !== 'pending') return ApiResponse::error('Document is not pending.', 409);
+
+        // Права учителя
+        if ($user['role'] === 'teacher') {
+            $teacher = $db->fetch("SELECT class_id FROM teachers WHERE user_id = :user_id", ['user_id' => $user['id']]);
+            if (!$teacher || !$teacher['class_id']) {
+                return ApiResponse::error('У вас нет привязанного класса.', 404);
+            }
+            $student = \App\Models\Student::find($document['student_id']);
+            if (!$student || (int)$student['class_id'] !== (int)$teacher['class_id']) {
+                return ApiResponse::error('Этот документ не ученика вашего класса.', 403);
+            }
+        }
+
+        try {
+            \App\Models\Document::updateStatus($documentId, 'rejected', $comment);
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to reject document: ' . $e->getMessage(), 500);
+        }
+
+        $log = date('Y-m-d H:i:s') . " [user_id: {$user['id']}] Отклонён документ ID $documentId, причина: $comment\n";
+        file_put_contents(__DIR__ . '/../../storage/logs/documents.log', $log, FILE_APPEND);
+
+        return ApiResponse::success(['document_id' => $documentId, 'status' => 'rejected']);
+    }
 }

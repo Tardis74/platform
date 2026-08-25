@@ -1030,6 +1030,338 @@ URL: /api.php?method=admin.tagDelete
 }
 }
 
+##Управление шаблонами документов (только для роли admin)
+
+###admin.template.list – список всех шаблонов документов.
+
+Метод: GET
+URL: /api.php?method=admin.template.list
+Ответ (200):
+{
+"success": true,
+"data": [
+{
+"id": 1,
+"name": "Согласие на обработку данных",
+"description": "Общее согласие для учеников",
+"content": "Я, {PARENT_FIO}, даю согласие...",
+"signature_level": "simple",
+"requires_file": false,
+"created_at": "2026-08-25 10:00:00",
+"updated_at": "2026-08-25 10:00:00"
+}
+]
+}
+
+###admin.template.create – создание нового шаблона.
+
+Метод: POST
+URL: /api.php?method=admin.template.create
+Тело (JSON):
+{
+"name": "Согласие на обработку данных",
+"description": "Общее согласие для учеников",
+"content": "Я, {PARENT_FIO}, даю согласие на обработку персональных данных моего ребенка {STUDENT_FIO}, класс {CLASS}, для целей образовательного процесса.",
+"signature_level": "simple", // возможные значения: simple, sms, goskey
+"requires_file": false // true – требуется загрузка файла, false – только подпись
+}
+Ответ (200):
+{
+"success": true,
+"data": {
+"template_id": 1,
+"message": "Шаблон создан"
+}
+}
+Ошибки: 400 – отсутствуют обязательные поля name или content; 403 – недостаточно прав.
+
+###admin.template.update – обновление существующего шаблона.
+
+Метод: POST
+URL: /api.php?method=admin.template.update
+Тело (JSON):
+{
+"id": 1,
+"name": "Новое название",
+"content": "Новый текст с плейсхолдерами",
+"signature_level": "sms",
+"requires_file": true
+}
+Ответ (200):
+{
+"success": true,
+"data": {
+"message": "Шаблон обновлён"
+}
+}
+Ошибки: 400 – id не указан или нет полей для обновления; 404 – шаблон не найден.
+
+###admin.template.delete – удаление шаблона.
+
+Метод: POST
+URL: /api.php?method=admin.template.delete
+Тело (JSON):
+{
+"id": 1
+}
+Ответ (200):
+{
+"success": true,
+"data": {
+"message": "Шаблон удалён"
+}
+}
+Ошибки: 400 – id не указан; 404 – шаблон не найден.
+
+##Работа с документами (родитель и ученик)
+
+###parent.uploadDocument – загрузка документа родителем для своего ребёнка.
+
+Метод: POST (multipart/form-data)
+URL: /api.php?method=parent.uploadDocument
+Параметры формы:
+
+student_id (int, обязательное) – ID ученика
+
+template_id (int, опционально) – ID шаблона, если документ по шаблону
+
+event_id (int, опционально) – ID мероприятия, если документ привязан к мероприятию
+
+file (файл, опционально) – загружаемый файл (если требуется)
+
+signature (boolean, опционально) – true для простой подписи (галочка), используется если шаблон не требует файла
+
+expiry_date (string, опционально) – срок действия в формате YYYY-MM-DD
+
+Ответ (200):
+{
+"success": true,
+"data": {
+"document_id": 10,
+"status": "pending",
+"message": "Документ отправлен на проверку"
+}
+}
+Ошибки: 400 – не указан student_id или не загружен файл при необходимости; 403 – ученик не принадлежит родителю; 404 – шаблон не найден.
+
+###parent.getDocuments – список документов для своих детей.
+
+Метод: GET
+URL: /api.php?method=parent.getDocuments
+Параметры URL (опционально):
+
+student_id – ID конкретного ребёнка (если не указан – все дети)
+
+status – фильтр по статусу (pending, approved, rejected, expired)
+
+Ответ (200):
+{
+"success": true,
+"data": [
+{
+"id": 10,
+"student_id": 1,
+"template_name": "Согласие на обработку данных",
+"status": "pending",
+"expiry_date": "2027-01-01",
+"created_at": "2026-08-25 12:00:00",
+"file_url": "/api.php?method=document.download&id=10" // если есть файл
+}
+]
+}
+
+###student.uploadDocument – загрузка документа учеником для себя.
+
+Метод: POST (multipart/form-data)
+URL: /api.php?method=student.uploadDocument
+Параметры формы:
+
+template_id (int, опционально) – ID шаблона
+
+event_id (int, опционально) – ID мероприятия
+
+file (файл, опционально) – загружаемый файл
+
+signature (boolean, опционально) – true для простой подписи
+
+expiry_date (string, опционально) – YYYY-MM-DD
+
+Ответ (200): аналогичен parent.uploadDocument.
+
+###student.getDocuments – список своих документов.
+
+Метод: GET
+URL: /api.php?method=student.getDocuments
+Параметры URL (опционально):
+
+status – фильтр по статусу
+
+Ответ (200): аналогичен parent.getDocuments, но только для текущего ученика.
+
+##Модерация документов (роли admin, moderator, teacher)
+
+###moderator.getPendingDocuments – получение списка документов на проверке.
+
+Метод: GET
+URL: /api.php?method=moderator.getPendingDocuments
+Параметры URL (опционально):
+
+student_id – фильтр по ученику
+
+event_id – фильтр по мероприятию
+
+Ответ (200):
+{
+"success": true,
+"data": [
+{
+"id": 10,
+"student_name": "Иванов Иван",
+"class_name": "10А",
+"template_name": "Согласие на обработку данных",
+"uploaded_by_name": "Петрова Мария",
+"status": "pending",
+"created_at": "2026-08-25 12:00:00",
+"file_url": "/api.php?method=document.download&id=10"
+}
+]
+}
+Примечание: для учителя возвращаются только документы учеников его класса.
+
+###moderator.confirmDocument – подтверждение документа.
+
+Метод: POST
+URL: /api.php?method=moderator.confirmDocument
+Тело (JSON):
+{
+"document_id": 10,
+"comment": "Все верно" // опционально
+}
+Ответ (200):
+{
+"success": true,
+"data": {
+"document_id": 10,
+"status": "approved"
+}
+}
+Ошибки: 400 – document_id не указан; 404 – документ не найден; 409 – документ не в статусе pending.
+
+###moderator.rejectDocument – отклонение документа с указанием причины.
+
+Метод: POST
+URL: /api.php?method=moderator.rejectDocument
+Тело (JSON):
+{
+"document_id": 10,
+"comment": "Недостаточно подтверждающих документов" // обязательно
+}
+Ответ (200):
+{
+"success": true,
+"data": {
+"document_id": 10,
+"status": "rejected"
+}
+}
+Ошибки: 400 – отсутствует comment; 404 – документ не найден; 409 – документ не в статусе pending.
+
+##Управление согласиями (родитель)
+
+###parent.giveConsent – дать согласие (общее, на мероприятие, на обработку данных).
+
+Метод: POST
+URL: /api.php?method=parent.giveConsent
+Тело (JSON):
+{
+"student_id": 1,
+"type": "general", // general, event, data_processing
+"version": "1.0" // версия документа согласия
+}
+Ответ (200):
+{
+"success": true,
+"data": {
+"consent_id": 5,
+"status": "active"
+}
+}
+Ошибки: 400 – не указаны student_id, type или version; 403 – ученик не принадлежит родителю; 409 – уже есть активное согласие этого типа (деактивируется автоматически).
+
+###parent.revokeConsent – отзыв согласия.
+
+Метод: POST
+URL: /api.php?method=parent.revokeConsent
+Тело (JSON):
+{
+"consent_id": 5
+}
+Ответ (200):
+{
+"success": true,
+"data": {
+"message": "Согласие отозвано"
+}
+}
+Ошибки: 400 – consent_id не указан; 404 – согласие не найдено; 403 – доступ запрещён (не своё согласие); 409 – уже отозвано.
+
+###parent.getConsents – список согласий с фильтрацией.
+
+Метод: GET
+URL: /api.php?method=parent.getConsents
+Параметры URL (опционально):
+
+student_id – ID ребёнка
+
+type – тип согласия (general, event, data_processing)
+
+Ответ (200):
+{
+"success": true,
+"data": [
+{
+"id": 5,
+"user_id": 2,
+"student_id": 1,
+"type": "general",
+"version": "1.0",
+"status": "active",
+"given_at": "2026-08-25 12:30:00",
+"revoked_at": null,
+"ip_address": "192.168.1.1"
+}
+]
+}
+
+##Системный метод для проверки сроков действия
+
+###system.checkExpiredDocuments – принудительная проверка и обновление статусов истекших документов. Вызывается по крону или администратором вручную.
+
+Метод: POST
+URL: /api.php?method=system.checkExpiredDocuments
+Требует роли admin.
+
+Ответ (200):
+{
+"success": true,
+"data": {
+"expired_count": 3,
+"message": "Обновлено 3 документов со статусом expired"
+}
+}
+
+##Примечания по использованию
+
+Для загрузки файлов документов используйте multipart/form-data (как и для достижений).
+
+Допустимые расширения: pdf, jpg, jpeg, png, doc, docx, odt. Максимальный размер – 10 МБ.
+
+Все действия логируются в storage/logs/documents.log.
+
+Для документа, созданного по шаблону, можно использовать автоподстановку плейсхолдеров: {STUDENT_FIO}, {PARENT_FIO}, {CLASS}, {DATE}. Эти данные подставляются при генерации содержимого (пока не реализовано в API, но модель DocumentTemplate содержит метод renderContent, который можно использовать при необходимости).
+
+Срок действия (expiry_date) – опциональный атрибут; при его наступлении документ автоматически переводится в статус expired.
+
 ##Коды ошибок (общие)
 
 400 – Неверный запрос (не хватает полей, неверный формат и т.п.)
