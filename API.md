@@ -11,3 +11,28 @@
 - **Параметры:** `student_id` (int)
 - **Ответ:** `{"success":true,"data":null,"error":null}`
 - **Ошибки:** 400 (нет student_id), 404 (ученик не найден), 409 (уже связан).
+
+## auth.register
+Регистрация нового родителя.
+
+**Метод:** `POST /api.php?method=auth.register`  
+**Параметры (JSON):**
+- `full_name` (string, обязательное)
+- `email` (string, обязательное, валидный email)
+- `password` (string, обязательное, мин. 6 символов)
+- `consent` (boolean, обязательное, должно быть `true`)
+
+**Успешный ответ (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "token": "jwt_token",
+    "user": {
+      "id": 1,
+      "email": "parent@example.com",
+      "full_name": "Иван Иванов",
+      "role": "parent"
+    }
+  }
+}

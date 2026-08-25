@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Хост: 127.0.0.1
--- Время создания: Авг 25 2026 г., 00:38
+-- Время создания: Авг 25 2026 г., 15:37
 -- Версия сервера: 10.4.27-MariaDB
 -- Версия PHP: 7.4.33
 
@@ -211,7 +211,8 @@ CREATE TABLE `students` (
   `snils_hash` varchar(64) NOT NULL,
   `class_id` int(10) UNSIGNED DEFAULT NULL,
   `total_points` int(11) NOT NULL DEFAULT 0,
-  `birth_date` date DEFAULT NULL
+  `birth_date` date DEFAULT NULL,
+  `is_dormitory` tinyint(1) NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
