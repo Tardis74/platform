@@ -170,4 +170,93 @@ class AuthController extends BaseController
             ]
         ]);
     }
+    
+    
+    /**
+     * Вход ученика по временному паролю.
+     */
+    public function studentLogin(DB $db, array $payload): ApiResponse
+    {
+        if (empty($payload['email']) || empty($payload['password'])) {
+            return ApiResponse::error('Email and password are required.', 400);
+        }
+
+        $user = User::getByEmail($payload['email']);
+        if (!$user || $user['role'] !== 'student') {
+            return ApiResponse::error('Invalid credentials.', 401);
+        }
+
+        if (!User::checkPassword($payload['password'], $user['password_hash'])) {
+            return ApiResponse::error('Invalid credentials.', 401);
+        }
+
+        // Проверяем, есть ли профиль ученика и активен ли он
+        $student = Student::findByUserId($user['id']);
+        if (!$student || $student['status'] !== 'active') {
+            return ApiResponse::error('Student account is not active.', 403);
+        }
+
+        $requiresChange = (bool)$user['first_login'];
+        $token = Auth::generateToken($user['id'], 'student');
+
+        return ApiResponse::success([
+            'token' => $token,
+            'user' => [
+                'id' => $user['id'],
+                'email' => $user['email'],
+                'full_name' => $user['full_name'],
+                'role' => 'student',
+            ],
+            'requires_password_change' => $requiresChange,
+        ]);
+    }
+
+    /**
+     * Смена пароля ученика (требует JWT).
+     */
+    public function studentChangePassword(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) {
+            return ApiResponse::error('Token required.', 401);
+        }
+
+        try {
+            $this->requireRole($token, 'student');
+        } catch (RuntimeException $e) {
+            return ApiResponse::error($e->getMessage(), 403);
+        }
+
+        $user = $this->getCurrentUser($token);
+        if (!$user) {
+            return ApiResponse::error('User not found.', 404);
+        }
+
+        if (empty($payload['current_password']) || empty($payload['new_password'])) {
+            return ApiResponse::error('current_password and new_password are required.', 400);
+        }
+
+        if (strlen($payload['new_password']) < 6) {
+            return ApiResponse::error('New password must be at least 6 characters.', 400);
+        }
+
+        // Проверка текущего пароля
+        if (!User::checkPassword($payload['current_password'], $user['password_hash'])) {
+            return ApiResponse::error('Current password is incorrect.', 400);
+        }
+
+        // Обновляем пароль
+        User::updatePassword($user['id'], $payload['new_password']);
+
+        // Если первый вход, сбрасываем флаг
+        if ($user['first_login']) {
+            User::updateFirstLogin($user['id'], false);
+        }
+
+        // Логирование
+        $log = date('Y-m-d H:i:s') . " Student {$user['id']} changed password\n";
+        file_put_contents(__DIR__ . '/../../storage/logs/portfolio.log', $log, FILE_APPEND);
+
+        return ApiResponse::success(['message' => 'Пароль изменён']);
+    }
 }

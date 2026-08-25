@@ -94,7 +94,7 @@ if ($method === 'ping') {
 }
 
 // === JWT Middleware (пропускаем публичные методы) ===
-$publicMethods = ['auth.login', 'auth.refresh', 'auth.register']; // можно добавить другие
+$publicMethods = ['auth.login', 'auth.refresh', 'auth.register', 'student.login'];
 $isPublic = in_array($method, $publicMethods);
 
 if (!$isPublic) {

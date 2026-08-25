@@ -163,4 +163,12 @@ class Student
         $stmt = $db->query($sql, ['id' => $studentId, 'reason' => $reason]);
         return $stmt->rowCount() > 0;
     }
+
+    public static function addPoints(int $studentId, int $points): bool
+    {
+        $db = DB::getInstance();
+        $sql = "UPDATE students SET total_points = total_points + :points WHERE id = :id";
+        $stmt = $db->query($sql, ['points' => $points, 'id' => $studentId]);
+        return $stmt->rowCount() > 0;
+    }
 }

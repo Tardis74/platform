@@ -70,4 +70,21 @@ class User
     {
         return password_verify($plain, $hash);
     }
+
+    public static function updatePassword(int $userId, string $newPassword): bool
+    {
+        $db = DB::getInstance();
+        $hash = password_hash($newPassword, PASSWORD_BCRYPT);
+        $sql = "UPDATE users SET password_hash = :hash WHERE id = :id";
+        $stmt = $db->query($sql, ['hash' => $hash, 'id' => $userId]);
+        return $stmt->rowCount() > 0;
+    }
+
+    public static function updateFirstLogin(int $userId, bool $value): bool
+    {
+        $db = DB::getInstance();
+        $sql = "UPDATE users SET first_login = :first_login WHERE id = :id";
+        $stmt = $db->query($sql, ['first_login' => (int)$value, 'id' => $userId]);
+        return $stmt->rowCount() > 0;
+    }
 }
