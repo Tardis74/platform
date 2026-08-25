@@ -255,4 +255,166 @@ class StudentController extends BaseController
         readfile($filePath);
         exit;
     }
+
+    /**
+     * Подать заявку на мероприятие.
+     */
+    public function eventRegister(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) {
+            return ApiResponse::error('Token required.', 401);
+        }
+
+        try {
+            $this->requireRole($token, 'student');
+        } catch (RuntimeException $e) {
+            return ApiResponse::error($e->getMessage(), 403);
+        }
+
+        $user = $this->getCurrentUser($token);
+        $student = Student::findByUserId($user['id']);
+        if (!$student || $student['status'] !== 'active') {
+            return ApiResponse::error('Student not found or inactive.', 404);
+        }
+
+        $eventId = (int)($payload['event_id'] ?? 0);
+        if ($eventId <= 0) {
+            return ApiResponse::error('event_id is required.', 400);
+        }
+
+        // Проверяем существование мероприятия и его статус
+        $event = Event::find($eventId);
+        if (!$event || $event['status'] !== 'active') {
+            return ApiResponse::error('Event not available.', 404);
+        }
+
+        // Проверяем доступность для ученика
+        if (!Event::isAvailableForStudent($eventId, $student['id'])) {
+            return ApiResponse::error('This event is not available for you.', 403);
+        }
+
+        // Проверяем, не зарегистрирован ли уже
+        $existing = \App\Models\EventRegistration::findByEventAndStudent($eventId, $student['id']);
+        if ($existing) {
+            return ApiResponse::error('You are already registered for this event.', 409);
+        }
+
+        // Атомарное увеличение счётчика
+        $affected = Event::atomicIncrement($eventId);
+        if ($affected === 0) {
+            return ApiResponse::error('No available spots left.', 409);
+        }
+
+        // Определяем статус заявки
+        $status = $event['requires_confirmation'] ? 'pending' : 'approved';
+
+        // Создаём заявку
+        try {
+            $regId = \App\Models\EventRegistration::create([
+                'event_id' => $eventId,
+                'student_id' => $student['id'],
+                'status' => $status,
+            ]);
+        } catch (\Exception $e) {
+            // Откатываем увеличение, если создание не удалось
+            Event::atomicDecrement($eventId);
+            return ApiResponse::error('Failed to create registration: ' . $e->getMessage(), 500);
+        }
+
+        // Логирование
+        $log = date('Y-m-d H:i:s') . " Student {$student['id']} registered for event $eventId, status $status\n";
+        file_put_contents(__DIR__ . '/../../storage/logs/events.log', $log, FILE_APPEND);
+
+        $message = $status === 'pending' ? 'Заявка подана, ожидает подтверждения' : 'Вы записаны на мероприятие';
+        return ApiResponse::success([
+            'registration_id' => $regId,
+            'status' => $status,
+            'message' => $message,
+        ]);
+    }
+
+    /**
+     * Отмена заявки учеником.
+     */
+    public function eventUnregister(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) {
+            return ApiResponse::error('Token required.', 401);
+        }
+
+        try {
+            $this->requireRole($token, 'student');
+        } catch (RuntimeException $e) {
+            return ApiResponse::error($e->getMessage(), 403);
+        }
+
+        $user = $this->getCurrentUser($token);
+        $student = Student::findByUserId($user['id']);
+        if (!$student) {
+            return ApiResponse::error('Student not found.', 404);
+        }
+
+        $eventId = (int)($payload['event_id'] ?? 0);
+        if ($eventId <= 0) {
+            return ApiResponse::error('event_id is required.', 400);
+        }
+
+        $registration = \App\Models\EventRegistration::findByEventAndStudent($eventId, $student['id']);
+        if (!$registration) {
+            return ApiResponse::error('Registration not found.', 404);
+        }
+
+        // Можно отменить только если статус pending или approved
+        if (!in_array($registration['status'], ['pending', 'approved'])) {
+            return ApiResponse::error('Cannot cancel registration with status ' . $registration['status'], 400);
+        }
+
+        // Обновляем статус на cancelled
+        try {
+            \App\Models\EventRegistration::updateStatus($registration['id'], 'cancelled');
+            // Уменьшаем счётчик
+            Event::atomicDecrement($eventId);
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to cancel registration: ' . $e->getMessage(), 500);
+        }
+
+        $log = date('Y-m-d H:i:s') . " Student {$student['id']} cancelled registration for event $eventId\n";
+        file_put_contents(__DIR__ . '/../../storage/logs/events.log', $log, FILE_APPEND);
+
+        return ApiResponse::success(['message' => 'Заявка отменена']);
+    }
+
+    /**
+     * Список мероприятий, на которые ученик записан.
+     */
+    public function eventMyRegistrations(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) {
+            return ApiResponse::error('Token required.', 401);
+        }
+
+        try {
+            $this->requireRole($token, 'student');
+        } catch (RuntimeException $e) {
+            return ApiResponse::error($e->getMessage(), 403);
+        }
+
+        $user = $this->getCurrentUser($token);
+        $student = Student::findByUserId($user['id']);
+        if (!$student) {
+            return ApiResponse::error('Student not found.', 404);
+        }
+
+        $filters = [
+            'status' => $_GET['status'] ?? null,
+            'start_date' => $_GET['start_date'] ?? null,
+            'end_date' => $_GET['end_date'] ?? null,
+        ];
+
+        $registrations = \App\Models\EventRegistration::getByStudent($student['id'], $filters);
+        return ApiResponse::success($registrations);
+    }
 }

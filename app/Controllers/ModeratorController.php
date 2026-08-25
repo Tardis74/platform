@@ -135,6 +135,175 @@ class ModeratorController extends BaseController
         return ApiResponse::success([
             'achievement_id' => $achievementId,
             'status'         => 'rejected',
+        ]); 
+    }
+
+    /**
+     * Список заявок на подтверждение.
+     */
+    public function getPendingRegistrations(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) {
+            return ApiResponse::error('Token required.', 401);
+        }
+
+        try {
+            $this->requireRole($token, ['admin', 'moderator', 'teacher']);
+        } catch (RuntimeException $e) {
+            return ApiResponse::error($e->getMessage(), 403);
+        }
+
+        $user = $this->getCurrentUser($token);
+        if (!$user) {
+            return ApiResponse::error('User not found.', 404);
+        }
+
+        $classId = null;
+        if ($user['role'] === 'teacher') {
+            // Находим класс учителя
+            $teacher = $db->fetch("SELECT class_id FROM teachers WHERE user_id = :user_id", ['user_id' => $user['id']]);
+            if (!$teacher || !$teacher['class_id']) {
+                return ApiResponse::error('У вас нет привязанного класса.', 404);
+            }
+            $classId = (int)$teacher['class_id'];
+        }
+
+        $filters = [
+            'event_id' => isset($payload['event_id']) ? (int)$payload['event_id'] : null,
+            'student_id' => isset($payload['student_id']) ? (int)$payload['student_id'] : null,
+            'status' => $payload['status'] ?? 'pending',
+        ];
+
+        $registrations = \App\Models\EventRegistration::getPending($filters, $classId);
+        return ApiResponse::success($registrations);
+    }
+
+    /**
+     * Подтверждение заявки.
+     */
+    public function confirmRegistration(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) {
+            return ApiResponse::error('Token required.', 401);
+        }
+
+        try {
+            $this->requireRole($token, ['admin', 'moderator', 'teacher']);
+        } catch (RuntimeException $e) {
+            return ApiResponse::error($e->getMessage(), 403);
+        }
+
+        $user = $this->getCurrentUser($token);
+        if (!$user) {
+            return ApiResponse::error('User not found.', 404);
+        }
+
+        $registrationId = (int)($payload['registration_id'] ?? 0);
+        if ($registrationId <= 0) {
+            return ApiResponse::error('registration_id is required.', 400);
+        }
+
+        $registration = \App\Models\EventRegistration::find($registrationId);
+        if (!$registration) {
+            return ApiResponse::error('Registration not found.', 404);
+        }
+
+        if ($registration['status'] !== 'pending') {
+            return ApiResponse::error('Registration is not pending.', 409);
+        }
+
+        // Для teacher проверяем, что ученик из его класса
+        if ($user['role'] === 'teacher') {
+            $teacher = $db->fetch("SELECT class_id FROM teachers WHERE user_id = :user_id", ['user_id' => $user['id']]);
+            if (!$teacher || !$teacher['class_id']) {
+                return ApiResponse::error('У вас нет привязанного класса.', 404);
+            }
+            $student = Student::find($registration['student_id']);
+            if (!$student || (int)$student['class_id'] !== (int)$teacher['class_id']) {
+                return ApiResponse::error('Этот ученик не из вашего класса.', 403);
+            }
+        }
+
+        try {
+            \App\Models\EventRegistration::updateStatus($registrationId, 'approved');
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to confirm registration: ' . $e->getMessage(), 500);
+        }
+
+        $log = date('Y-m-d H:i:s') . " Registration $registrationId confirmed by user {$user['id']}\n";
+        file_put_contents(__DIR__ . '/../../storage/logs/events.log', $log, FILE_APPEND);
+
+        return ApiResponse::success([
+            'registration_id' => $registrationId,
+            'status' => 'approved',
+        ]);
+    }
+
+    /**
+     * Отклонение заявки.
+     */
+    public function rejectRegistration(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) {
+            return ApiResponse::error('Token required.', 401);
+        }
+
+        try {
+            $this->requireRole($token, ['admin', 'moderator', 'teacher']);
+        } catch (RuntimeException $e) {
+            return ApiResponse::error($e->getMessage(), 403);
+        }
+
+        $user = $this->getCurrentUser($token);
+        if (!$user) {
+            return ApiResponse::error('User not found.', 404);
+        }
+
+        $registrationId = (int)($payload['registration_id'] ?? 0);
+        if ($registrationId <= 0) {
+            return ApiResponse::error('registration_id is required.', 400);
+        }
+
+        $registration = \App\Models\EventRegistration::find($registrationId);
+        if (!$registration) {
+            return ApiResponse::error('Registration not found.', 404);
+        }
+
+        if ($registration['status'] !== 'pending') {
+            return ApiResponse::error('Registration is not pending.', 409);
+        }
+
+        // Права для teacher
+        if ($user['role'] === 'teacher') {
+            $teacher = $db->fetch("SELECT class_id FROM teachers WHERE user_id = :user_id", ['user_id' => $user['id']]);
+            if (!$teacher || !$teacher['class_id']) {
+                return ApiResponse::error('У вас нет привязанного класса.', 404);
+            }
+            $student = Student::find($registration['student_id']);
+            if (!$student || (int)$student['class_id'] !== (int)$teacher['class_id']) {
+                return ApiResponse::error('Этот ученик не из вашего класса.', 403);
+            }
+        }
+
+        $reason = $payload['reason'] ?? null;
+
+        try {
+            \App\Models\EventRegistration::updateStatus($registrationId, 'rejected', $reason);
+            // Возвращаем место
+            Event::atomicDecrement($registration['event_id']);
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to reject registration: ' . $e->getMessage(), 500);
+        }
+
+        $log = date('Y-m-d H:i:s') . " Registration $registrationId rejected by user {$user['id']}, reason: " . ($reason ?: 'не указана') . "\n";
+        file_put_contents(__DIR__ . '/../../storage/logs/events.log', $log, FILE_APPEND);
+
+        return ApiResponse::success([
+            'registration_id' => $registrationId,
+            'status' => 'rejected',
         ]);
     }
 }

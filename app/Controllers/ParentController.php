@@ -251,4 +251,73 @@ class ParentController extends BaseController
             'message'    => 'Запрос на привязку отправлен.'
         ]);
     }
+
+    /**
+     * Получить мероприятия, на которые записаны дети родителя.
+     */
+    public function getChildrenEvents(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) {
+            return ApiResponse::error('Token required.', 401);
+        }
+
+        try {
+            $this->requireRole($token, 'parent');
+        } catch (RuntimeException $e) {
+            return ApiResponse::error($e->getMessage(), 403);
+        }
+
+        $user = $this->getCurrentUser($token);
+        if (!$user) {
+            return ApiResponse::error('User not found.', 404);
+        }
+
+        $parent = $db->fetch("SELECT id FROM parents WHERE user_id = :user_id", ['user_id' => $user['id']]);
+        if (!$parent) {
+            return ApiResponse::error('Parent profile not found.', 404);
+        }
+        $parentId = $parent['id'];
+
+        $childId = isset($payload['child_id']) ? (int)$payload['child_id'] : null;
+        $startDate = $_GET['start_date'] ?? null;
+        $endDate = $_GET['end_date'] ?? null;
+
+        // Получаем детей
+        $childrenQuery = "SELECT student_id FROM parent_student WHERE parent_id = :parent_id";
+        $childrenParams = ['parent_id' => $parentId];
+        if ($childId) {
+            $childrenQuery .= " AND student_id = :child_id";
+            $childrenParams['child_id'] = $childId;
+        }
+        $children = $db->fetchAll($childrenQuery, $childrenParams);
+        $studentIds = array_column($children, 'student_id');
+        if (empty($studentIds)) {
+            return ApiResponse::success([]);
+        }
+
+        // Получаем заявки этих студентов
+        $placeholders = implode(',', array_fill(0, count($studentIds), '?'));
+        $sql = "SELECT r.*, e.title, e.start_datetime, e.end_datetime, e.location, 
+                    s.id as student_id, u.full_name as student_name
+                FROM event_registrations r
+                JOIN events e ON r.event_id = e.id
+                JOIN students s ON r.student_id = s.id
+                JOIN users u ON s.user_id = u.id
+                WHERE r.student_id IN ($placeholders)";
+
+        $params = $studentIds;
+        if ($startDate) {
+            $sql .= " AND e.start_datetime >= ?";
+            $params[] = $startDate;
+        }
+        if ($endDate) {
+            $sql .= " AND e.start_datetime <= ?";
+            $params[] = $endDate;
+        }
+        $sql .= " ORDER BY e.start_datetime ASC";
+
+        $registrations = $db->fetchAll($sql, $params);
+        return ApiResponse::success($registrations);
+    }
 }

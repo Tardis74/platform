@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Хост: 127.0.0.1
--- Время создания: Авг 25 2026 г., 16:09
+-- Время создания: Авг 25 2026 г., 18:09
 -- Версия сервера: 10.4.27-MariaDB
 -- Версия PHP: 7.4.33
 
@@ -20,6 +20,47 @@ SET time_zone = "+00:00";
 --
 -- База данных: `lyceum_db`
 --
+
+-- --------------------------------------------------------
+
+--
+-- Структура таблицы `achievements`
+--
+
+CREATE TABLE `achievements` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `student_id` int(10) UNSIGNED NOT NULL,
+  `category_id` int(10) UNSIGNED NOT NULL,
+  `title` varchar(255) NOT NULL,
+  `description` text DEFAULT NULL,
+  `file_path` varchar(255) NOT NULL,
+  `status` enum('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+  `moderator_comment` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Структура таблицы `achievement_categories`
+--
+
+CREATE TABLE `achievement_categories` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `name` varchar(100) NOT NULL,
+  `weight` int(10) UNSIGNED NOT NULL DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Дамп данных таблицы `achievement_categories`
+--
+
+INSERT INTO `achievement_categories` (`id`, `name`, `weight`, `created_at`) VALUES
+(1, 'Олимпиада', 10, '2026-08-25 14:16:21'),
+(2, 'Спорт', 5, '2026-08-25 14:16:21'),
+(3, 'Творчество', 3, '2026-08-25 14:16:21');
 
 -- --------------------------------------------------------
 
@@ -77,13 +118,54 @@ CREATE TABLE `events` (
   `id` int(10) UNSIGNED NOT NULL,
   `title` varchar(255) NOT NULL,
   `description` text DEFAULT NULL,
-  `event_date` datetime NOT NULL,
+  `start_datetime` datetime NOT NULL,
+  `end_datetime` datetime DEFAULT NULL,
+  `location` varchar(255) DEFAULT NULL,
+  `category_id` int(10) UNSIGNED DEFAULT NULL,
   `max_participants` int(10) UNSIGNED DEFAULT NULL,
   `current_count` int(10) UNSIGNED NOT NULL DEFAULT 0,
-  `status` enum('draft','open','closed','cancelled') NOT NULL DEFAULT 'draft',
+  `points` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `requires_confirmation` tinyint(1) NOT NULL DEFAULT 1,
+  `requires_documents` tinyint(1) NOT NULL DEFAULT 0,
+  `status` enum('active','cancelled','completed') NOT NULL DEFAULT 'active',
   `created_by` int(10) UNSIGNED NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Структура таблицы `event_categories`
+--
+
+CREATE TABLE `event_categories` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `name` varchar(100) NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Структура таблицы `event_class_access`
+--
+
+CREATE TABLE `event_class_access` (
+  `event_id` int(10) UNSIGNED NOT NULL,
+  `class_id` int(10) UNSIGNED NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Структура таблицы `event_dormitory_access`
+--
+
+CREATE TABLE `event_dormitory_access` (
+  `event_id` int(10) UNSIGNED NOT NULL,
+  `is_dormitory` tinyint(1) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -95,8 +177,34 @@ CREATE TABLE `event_registrations` (
   `id` int(10) UNSIGNED NOT NULL,
   `event_id` int(10) UNSIGNED NOT NULL,
   `student_id` int(10) UNSIGNED NOT NULL,
-  `registered_at` timestamp NOT NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  `status` enum('draft','pending','approved','rejected','cancelled','completed') NOT NULL DEFAULT 'pending',
+  `comment` text DEFAULT NULL,
+  `registered_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Структура таблицы `event_tags`
+--
+
+CREATE TABLE `event_tags` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `name` varchar(50) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Структура таблицы `event_tag_links`
+--
+
+CREATE TABLE `event_tag_links` (
+  `event_id` int(10) UNSIGNED NOT NULL,
+  `tag_id` int(10) UNSIGNED NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -243,19 +351,35 @@ CREATE TABLE `users` (
   `role` enum('admin','teacher','parent','student') NOT NULL,
   `full_name` varchar(255) NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NULL DEFAULT NULL ON UPDATE current_timestamp()
+  `updated_at` timestamp NULL DEFAULT NULL ON UPDATE current_timestamp(),
+  `first_login` tinyint(1) NOT NULL DEFAULT 1
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Дамп данных таблицы `users`
 --
 
-INSERT INTO `users` (`id`, `email`, `password_hash`, `role`, `full_name`, `created_at`, `updated_at`) VALUES
-(1, 'admin@example.com', '$2y$10$lQxdksaPab0v5LqkWfrRk.Fu1rl70qoRrrwyir7I0/ytwJREP3K5C', 'admin', 'Admin User', '2026-08-24 22:34:14', NULL);
+INSERT INTO `users` (`id`, `email`, `password_hash`, `role`, `full_name`, `created_at`, `updated_at`, `first_login`) VALUES
+(1, 'admin@example.com', '$2y$10$lQxdksaPab0v5LqkWfrRk.Fu1rl70qoRrrwyir7I0/ytwJREP3K5C', 'admin', 'Admin User', '2026-08-24 22:34:14', NULL, 1);
 
 --
 -- Индексы сохранённых таблиц
 --
+
+--
+-- Индексы таблицы `achievements`
+--
+ALTER TABLE `achievements`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `student_id` (`student_id`),
+  ADD KEY `category_id` (`category_id`),
+  ADD KEY `status` (`status`);
+
+--
+-- Индексы таблицы `achievement_categories`
+--
+ALTER TABLE `achievement_categories`
+  ADD PRIMARY KEY (`id`);
 
 --
 -- Индексы таблицы `audit_logs`
@@ -276,18 +400,53 @@ ALTER TABLE `classes`
 --
 ALTER TABLE `events`
   ADD PRIMARY KEY (`id`),
-  ADD KEY `idx_event_date` (`event_date`),
-  ADD KEY `idx_status` (`status`),
-  ADD KEY `idx_created_by` (`created_by`);
+  ADD KEY `category_id` (`category_id`),
+  ADD KEY `start_datetime` (`start_datetime`),
+  ADD KEY `status` (`status`),
+  ADD KEY `fk_events_creator` (`created_by`);
+
+--
+-- Индексы таблицы `event_categories`
+--
+ALTER TABLE `event_categories`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- Индексы таблицы `event_class_access`
+--
+ALTER TABLE `event_class_access`
+  ADD PRIMARY KEY (`event_id`,`class_id`),
+  ADD KEY `fk_event_class_class` (`class_id`);
+
+--
+-- Индексы таблицы `event_dormitory_access`
+--
+ALTER TABLE `event_dormitory_access`
+  ADD PRIMARY KEY (`event_id`,`is_dormitory`);
 
 --
 -- Индексы таблицы `event_registrations`
 --
 ALTER TABLE `event_registrations`
   ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `uk_event_student` (`event_id`,`student_id`),
-  ADD KEY `idx_student_id` (`student_id`),
-  ADD KEY `idx_event_id` (`event_id`);
+  ADD UNIQUE KEY `unique_registration` (`event_id`,`student_id`),
+  ADD KEY `event_id` (`event_id`),
+  ADD KEY `student_id` (`student_id`),
+  ADD KEY `status` (`status`);
+
+--
+-- Индексы таблицы `event_tags`
+--
+ALTER TABLE `event_tags`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `name` (`name`);
+
+--
+-- Индексы таблицы `event_tag_links`
+--
+ALTER TABLE `event_tag_links`
+  ADD PRIMARY KEY (`event_id`,`tag_id`),
+  ADD KEY `fk_event_tag_tag` (`tag_id`);
 
 --
 -- Индексы таблицы `kpp_logs`
@@ -362,6 +521,18 @@ ALTER TABLE `users`
 --
 
 --
+-- AUTO_INCREMENT для таблицы `achievements`
+--
+ALTER TABLE `achievements`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT для таблицы `achievement_categories`
+--
+ALTER TABLE `achievement_categories`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+
+--
 -- AUTO_INCREMENT для таблицы `audit_logs`
 --
 ALTER TABLE `audit_logs`
@@ -380,9 +551,21 @@ ALTER TABLE `events`
   MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
+-- AUTO_INCREMENT для таблицы `event_categories`
+--
+ALTER TABLE `event_categories`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT для таблицы `event_registrations`
 --
 ALTER TABLE `event_registrations`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT для таблицы `event_tags`
+--
+ALTER TABLE `event_tags`
   MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
@@ -432,6 +615,13 @@ ALTER TABLE `users`
 --
 
 --
+-- Ограничения внешнего ключа таблицы `achievements`
+--
+ALTER TABLE `achievements`
+  ADD CONSTRAINT `fk_achievements_category` FOREIGN KEY (`category_id`) REFERENCES `achievement_categories` (`id`),
+  ADD CONSTRAINT `fk_achievements_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE;
+
+--
 -- Ограничения внешнего ключа таблицы `classes`
 --
 ALTER TABLE `classes`
@@ -441,14 +631,35 @@ ALTER TABLE `classes`
 -- Ограничения внешнего ключа таблицы `events`
 --
 ALTER TABLE `events`
-  ADD CONSTRAINT `fk_events_created_by` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+  ADD CONSTRAINT `fk_events_category` FOREIGN KEY (`category_id`) REFERENCES `event_categories` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_events_creator` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`);
+
+--
+-- Ограничения внешнего ключа таблицы `event_class_access`
+--
+ALTER TABLE `event_class_access`
+  ADD CONSTRAINT `fk_event_class_class` FOREIGN KEY (`class_id`) REFERENCES `classes` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_event_class_event` FOREIGN KEY (`event_id`) REFERENCES `events` (`id`) ON DELETE CASCADE;
+
+--
+-- Ограничения внешнего ключа таблицы `event_dormitory_access`
+--
+ALTER TABLE `event_dormitory_access`
+  ADD CONSTRAINT `fk_event_dormitory` FOREIGN KEY (`event_id`) REFERENCES `events` (`id`) ON DELETE CASCADE;
 
 --
 -- Ограничения внешнего ключа таблицы `event_registrations`
 --
 ALTER TABLE `event_registrations`
-  ADD CONSTRAINT `fk_event_registrations_event_id` FOREIGN KEY (`event_id`) REFERENCES `events` (`id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `fk_event_registrations_student_id` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE;
+  ADD CONSTRAINT `fk_registration_event` FOREIGN KEY (`event_id`) REFERENCES `events` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_registration_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE;
+
+--
+-- Ограничения внешнего ключа таблицы `event_tag_links`
+--
+ALTER TABLE `event_tag_links`
+  ADD CONSTRAINT `fk_event_tag_event` FOREIGN KEY (`event_id`) REFERENCES `events` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_event_tag_tag` FOREIGN KEY (`tag_id`) REFERENCES `event_tags` (`id`) ON DELETE CASCADE;
 
 --
 -- Ограничения внешнего ключа таблицы `link_requests`

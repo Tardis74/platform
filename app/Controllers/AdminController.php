@@ -135,4 +135,282 @@ class AdminController extends BaseController
             'message'    => 'Ученик отклонён администратором'
         ]);
     }
+
+    // Категории
+    public function categoryList(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) return ApiResponse::error('Token required.', 401);
+        try { $this->requireRole($token, ['admin', 'moderator']); } catch (RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
+        return ApiResponse::success(\App\Models\EventCategory::all());
+    }
+
+    /**
+     * Создать новую категорию (только admin).
+     */
+    public function categoryCreate(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) {
+            return ApiResponse::error('Token required.', 401);
+        }
+        try {
+            $this->requireRole($token, ['admin']);
+        } catch (RuntimeException $e) {
+            return ApiResponse::error($e->getMessage(), 403);
+        }
+
+        $user = $this->getCurrentUser($token);
+        if (empty($payload['name'])) {
+            return ApiResponse::error('name is required.', 400);
+        }
+
+        try {
+            $id = \App\Models\EventCategory::create($payload['name']);
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to create category: ' . $e->getMessage(), 500);
+        }
+
+        $log = date('Y-m-d H:i:s') . " Category created ID $id by user {$user['id']}\n";
+        file_put_contents(__DIR__ . '/../../storage/logs/events.log', $log, FILE_APPEND);
+
+        return ApiResponse::success([
+            'category_id' => $id,
+            'message'     => 'Категория создана',
+        ]);
+    }
+
+    /**
+     * Обновить категорию (только admin).
+     */
+    public function categoryUpdate(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) {
+            return ApiResponse::error('Token required.', 401);
+        }
+        try {
+            $this->requireRole($token, ['admin']);
+        } catch (RuntimeException $e) {
+            return ApiResponse::error($e->getMessage(), 403);
+        }
+
+        $categoryId = (int)($payload['id'] ?? 0);
+        if ($categoryId <= 0) {
+            return ApiResponse::error('id is required and must be positive.', 400);
+        }
+        if (empty($payload['name'])) {
+            return ApiResponse::error('name is required.', 400);
+        }
+
+        $category = \App\Models\EventCategory::find($categoryId);
+        if (!$category) {
+            return ApiResponse::error('Category not found.', 404);
+        }
+
+        try {
+            $updated = \App\Models\EventCategory::update($categoryId, $payload['name']);
+            if (!$updated) {
+                return ApiResponse::error('Category not updated (no changes?)', 400);
+            }
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to update category: ' . $e->getMessage(), 500);
+        }
+
+        $user = $this->getCurrentUser($token);
+        $log = date('Y-m-d H:i:s') . " Category updated ID $categoryId by user {$user['id']}\n";
+        file_put_contents(__DIR__ . '/../../storage/logs/events.log', $log, FILE_APPEND);
+
+        return ApiResponse::success(['message' => 'Категория обновлена']);
+    }
+
+    /**
+     * Удалить категорию (только admin).
+     */
+    public function categoryDelete(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) {
+            return ApiResponse::error('Token required.', 401);
+        }
+        try {
+            $this->requireRole($token, ['admin']);
+        } catch (RuntimeException $e) {
+            return ApiResponse::error($e->getMessage(), 403);
+        }
+
+        $categoryId = (int)($payload['id'] ?? 0);
+        if ($categoryId <= 0) {
+            return ApiResponse::error('id is required and must be positive.', 400);
+        }
+
+        $category = \App\Models\EventCategory::find($categoryId);
+        if (!$category) {
+            return ApiResponse::error('Category not found.', 404);
+        }
+
+        try {
+            $deleted = \App\Models\EventCategory::delete($categoryId);
+            if (!$deleted) {
+                return ApiResponse::error('Category not deleted.', 400);
+            }
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to delete category: ' . $e->getMessage(), 500);
+        }
+
+        $user = $this->getCurrentUser($token);
+        $log = date('Y-m-d H:i:s') . " Category deleted ID $categoryId by user {$user['id']}\n";
+        file_put_contents(__DIR__ . '/../../storage/logs/events.log', $log, FILE_APPEND);
+
+        return ApiResponse::success(['message' => 'Категория удалена']);
+    }
+
+    // ========== Управление тегами ==========
+
+    /**
+     * Получить список всех тегов (для всех авторизованных).
+     */
+    public function tagList(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) {
+            return ApiResponse::error('Token required.', 401);
+        }
+        try {
+            $this->getCurrentUser($token);
+        } catch (RuntimeException $e) {
+            return ApiResponse::error($e->getMessage(), 401);
+        }
+        return ApiResponse::success(\App\Models\EventTag::all());
+    }
+
+    /**
+     * Создать новый тег (только admin).
+     */
+    public function tagCreate(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) {
+            return ApiResponse::error('Token required.', 401);
+        }
+        try {
+            $this->requireRole($token, ['admin']);
+        } catch (RuntimeException $e) {
+            return ApiResponse::error($e->getMessage(), 403);
+        }
+
+        $user = $this->getCurrentUser($token);
+        if (empty($payload['name'])) {
+            return ApiResponse::error('name is required.', 400);
+        }
+
+        // Проверяем уникальность имени
+        if (\App\Models\EventTag::findByName($payload['name'])) {
+            return ApiResponse::error('Tag with this name already exists.', 409);
+        }
+
+        try {
+            $id = \App\Models\EventTag::create($payload['name']);
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to create tag: ' . $e->getMessage(), 500);
+        }
+
+        $log = date('Y-m-d H:i:s') . " Tag created ID $id by user {$user['id']}\n";
+        file_put_contents(__DIR__ . '/../../storage/logs/events.log', $log, FILE_APPEND);
+
+        return ApiResponse::success([
+            'tag_id'  => $id,
+            'message' => 'Тег создан',
+        ]);
+    }
+
+    /**
+     * Обновить тег (только admin).
+     */
+    public function tagUpdate(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) {
+            return ApiResponse::error('Token required.', 401);
+        }
+        try {
+            $this->requireRole($token, ['admin']);
+        } catch (RuntimeException $e) {
+            return ApiResponse::error($e->getMessage(), 403);
+        }
+
+        $tagId = (int)($payload['id'] ?? 0);
+        if ($tagId <= 0) {
+            return ApiResponse::error('id is required and must be positive.', 400);
+        }
+        if (empty($payload['name'])) {
+            return ApiResponse::error('name is required.', 400);
+        }
+
+        $tag = \App\Models\EventTag::find($tagId);
+        if (!$tag) {
+            return ApiResponse::error('Tag not found.', 404);
+        }
+
+        // Если имя меняется, проверяем уникальность
+        if ($tag['name'] !== $payload['name'] && \App\Models\EventTag::findByName($payload['name'])) {
+            return ApiResponse::error('Tag with this name already exists.', 409);
+        }
+
+        try {
+            $updated = \App\Models\EventTag::update($tagId, $payload['name']);
+            if (!$updated) {
+                return ApiResponse::error('Tag not updated (no changes?)', 400);
+            }
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to update tag: ' . $e->getMessage(), 500);
+        }
+
+        $user = $this->getCurrentUser($token);
+        $log = date('Y-m-d H:i:s') . " Tag updated ID $tagId by user {$user['id']}\n";
+        file_put_contents(__DIR__ . '/../../storage/logs/events.log', $log, FILE_APPEND);
+
+        return ApiResponse::success(['message' => 'Тег обновлён']);
+    }
+
+    /**
+     * Удалить тег (только admin).
+     */
+    public function tagDelete(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) {
+            return ApiResponse::error('Token required.', 401);
+        }
+        try {
+            $this->requireRole($token, ['admin']);
+        } catch (RuntimeException $e) {
+            return ApiResponse::error($e->getMessage(), 403);
+        }
+
+        $tagId = (int)($payload['id'] ?? 0);
+        if ($tagId <= 0) {
+            return ApiResponse::error('id is required and must be positive.', 400);
+        }
+
+        $tag = \App\Models\EventTag::find($tagId);
+        if (!$tag) {
+            return ApiResponse::error('Tag not found.', 404);
+        }
+
+        try {
+            $deleted = \App\Models\EventTag::delete($tagId);
+            if (!$deleted) {
+                return ApiResponse::error('Tag not deleted.', 400);
+            }
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to delete tag: ' . $e->getMessage(), 500);
+        }
+
+        $user = $this->getCurrentUser($token);
+        $log = date('Y-m-d H:i:s') . " Tag deleted ID $tagId by user {$user['id']}\n";
+        file_put_contents(__DIR__ . '/../../storage/logs/events.log', $log, FILE_APPEND);
+
+        return ApiResponse::success(['message' => 'Тег удалён']);
+    }
 }
