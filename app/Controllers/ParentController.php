@@ -253,8 +253,9 @@ class ParentController extends BaseController
     }
 
     /**
-     * Получить мероприятия, на которые записаны дети родителя.
-     */
+    * Получить мероприятия, на которые записаны дети родителя.
+    * Дополнительно поддерживается фильтрация по event_id, child_id, датам.
+    */
     public function getChildrenEvents(DB $db, array $payload): ApiResponse
     {
         $token = $this->extractTokenFromHeader();
@@ -279,9 +280,11 @@ class ParentController extends BaseController
         }
         $parentId = $parent['id'];
 
-        $childId = isset($payload['child_id']) ? (int)$payload['child_id'] : null;
-        $startDate = $_GET['start_date'] ?? null;
-        $endDate = $_GET['end_date'] ?? null;
+        // ---- ИЗМЕНЕНИЕ: получаем параметры из payload (и из GET для обратной совместимости) ----
+        $childId   = isset($payload['child_id']) ? (int)$payload['child_id'] : null;
+        $startDate = $payload['start_date'] ?? $_GET['start_date'] ?? null;
+        $endDate   = $payload['end_date'] ?? $_GET['end_date'] ?? null;
+        $eventId   = isset($payload['event_id']) ? (int)$payload['event_id'] : null;   // <-- НОВЫЙ ПАРАМЕТР
 
         // Получаем детей
         $childrenQuery = "SELECT student_id FROM parent_student WHERE parent_id = :parent_id";
@@ -307,6 +310,13 @@ class ParentController extends BaseController
                 WHERE r.student_id IN ($placeholders)";
 
         $params = $studentIds;
+
+        // ---- ИЗМЕНЕНИЕ: добавляем фильтр по event_id, если передан ----
+        if ($eventId) {
+            $sql .= " AND r.event_id = ?";
+            $params[] = $eventId;
+        }
+
         if ($startDate) {
             $sql .= " AND e.start_datetime >= ?";
             $params[] = $startDate;
@@ -652,5 +662,117 @@ class ParentController extends BaseController
         $status = $payload['status'] ?? null;
         $requests = LeaveRequest::getByParent($parentId, $status);
         return ApiResponse::success($requests);
+    }
+
+    // ========== Уведомления ==========
+    public function getNotifications(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) return ApiResponse::error('Token required.', 401);
+        try { $this->requireRole($token, 'parent'); } catch (\RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
+
+        $user = $this->getCurrentUser($token);
+        $parent = $db->fetch("SELECT id FROM parents WHERE user_id = :user_id", ['user_id' => $user['id']]);
+        if (!$parent) return ApiResponse::error('Parent profile not found.', 404);
+        $parentId = $parent['id'];
+
+        // Генерируем уведомления: статусы детей, последние события
+        $children = $this->getChildren($db, $payload)->getData();
+        $notifications = [];
+        foreach ($children as $child) {
+            $notifications[] = [
+                'text' => $child['full_name'] . ' — ' . ($child['status'] === 'active' ? 'подтверждён' : 'ожидает подтверждения'),
+                'time' => date('Y-m-d H:i:s'),
+                'icon' => $child['status'] === 'active' ? '✅' : '⏳'
+            ];
+        }
+        // Можно добавить больше событий (например, из таблицы аудита) – для простоты оставляем так
+        return ApiResponse::success($notifications);
+    }
+
+    // ========== Запись на мероприятие для ребёнка ==========
+    public function registerChildForEvent(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) return ApiResponse::error('Token required.', 401);
+        try { $this->requireRole($token, 'parent'); } catch (\RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
+
+        $user = $this->getCurrentUser($token);
+        $parent = $db->fetch("SELECT id FROM parents WHERE user_id = :user_id", ['user_id' => $user['id']]);
+        if (!$parent) return ApiResponse::error('Parent profile not found.', 404);
+        $parentId = $parent['id'];
+
+        $studentId = (int)($payload['student_id'] ?? 0);
+        $eventId = (int)($payload['event_id'] ?? 0);
+        if ($studentId <= 0 || $eventId <= 0) return ApiResponse::error('student_id and event_id required.', 400);
+
+        // Проверка, что ребёнок привязан
+        $link = $db->fetch("SELECT 1 FROM parent_student WHERE parent_id = :parent_id AND student_id = :student_id",
+            ['parent_id' => $parentId, 'student_id' => $studentId]);
+        if (!$link) return ApiResponse::error('This student is not linked to you.', 403);
+
+        // Проверка существования мероприятия и доступности
+        $event = \App\Models\Event::find($eventId);
+        if (!$event || $event['status'] !== 'active') return ApiResponse::error('Event not available.', 404);
+        if (!\App\Models\Event::isAvailableForStudent($eventId, $studentId)) {
+            return ApiResponse::error('Event not available for this student.', 403);
+        }
+
+        // Проверка, не зарегистрирован ли уже
+        $existing = \App\Models\EventRegistration::findByEventAndStudent($eventId, $studentId);
+        if ($existing) return ApiResponse::error('Already registered.', 409);
+
+        // Атомарное увеличение счётчика
+        $affected = \App\Models\Event::atomicIncrement($eventId);
+        if ($affected === 0) return ApiResponse::error('No available spots left.', 409);
+
+        $status = $event['requires_confirmation'] ? 'pending' : 'approved';
+        try {
+            $regId = \App\Models\EventRegistration::create([
+                'event_id'   => $eventId,
+                'student_id' => $studentId,
+                'status'     => $status,
+            ]);
+        } catch (\Exception $e) {
+            \App\Models\Event::atomicDecrement($eventId);
+            return ApiResponse::error('Failed to create registration: ' . $e->getMessage(), 500);
+        }
+
+        return ApiResponse::success(['registration_id' => $regId, 'status' => $status]);
+    }
+
+    public function unregisterChildForEvent(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) return ApiResponse::error('Token required.', 401);
+        try { $this->requireRole($token, 'parent'); } catch (\RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
+
+        $user = $this->getCurrentUser($token);
+        $parent = $db->fetch("SELECT id FROM parents WHERE user_id = :user_id", ['user_id' => $user['id']]);
+        if (!$parent) return ApiResponse::error('Parent profile not found.', 404);
+        $parentId = $parent['id'];
+
+        $studentId = (int)($payload['student_id'] ?? 0);
+        $eventId = (int)($payload['event_id'] ?? 0);
+        if ($studentId <= 0 || $eventId <= 0) return ApiResponse::error('student_id and event_id required.', 400);
+
+        $link = $db->fetch("SELECT 1 FROM parent_student WHERE parent_id = :parent_id AND student_id = :student_id",
+            ['parent_id' => $parentId, 'student_id' => $studentId]);
+        if (!$link) return ApiResponse::error('This student is not linked to you.', 403);
+
+        $registration = \App\Models\EventRegistration::findByEventAndStudent($eventId, $studentId);
+        if (!$registration) return ApiResponse::error('Registration not found.', 404);
+        if (!in_array($registration['status'], ['pending', 'approved'])) {
+            return ApiResponse::error('Cannot cancel registration with status ' . $registration['status'], 400);
+        }
+
+        try {
+            \App\Models\EventRegistration::updateStatus($registration['id'], 'cancelled');
+            \App\Models\Event::atomicDecrement($eventId);
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to cancel registration: ' . $e->getMessage(), 500);
+        }
+
+        return ApiResponse::success(['message' => 'Registration cancelled']);
     }
 }

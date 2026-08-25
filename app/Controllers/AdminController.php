@@ -587,4 +587,17 @@ class AdminController extends BaseController
         }
         return ApiResponse::success($list);
     }
+
+    public function classList(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) return ApiResponse::error('Token required.', 401);
+        // Можно разрешить всем авторизованным (родителям) – проверка роли не нужна, т.к. это только чтение
+        try {
+            $this->getCurrentUser($token);
+        } catch (\RuntimeException $e) {
+            return ApiResponse::error($e->getMessage(), 401);
+        }
+        return ApiResponse::success(\App\Models\SchoolClass::all());
+    }
 }

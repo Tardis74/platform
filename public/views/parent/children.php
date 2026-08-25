@@ -1,47 +1,40 @@
 <?php
 /**
- * Дашборд родителя.
- * Содержит список детей, ленту уведомлений и быстрые действия.
+ * Управление детьми – таблица со списком, модальные окна добавления и привязки.
  */
 ?>
 <div class="container-fluid py-4">
-    <div class="row">
-        <!-- Левая колонка: дети и быстрые действия -->
-        <div class="col-lg-7">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h4 class="mb-0">👨‍👩‍👧 Мои дети</h4>
-                <div>
-                    <button class="btn btn-sm btn-primary me-2" data-bs-toggle="modal" data-bs-target="#addChildModal">
-                        <i class="bi bi-plus-circle"></i> Добавить
-                    </button>
-                    <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#linkChildModal">
-                        <i class="bi bi-link"></i> Привязать
-                    </button>
-                </div>
-            </div>
-            <div id="children-list" class="row row-cols-1 row-cols-md-2 g-3">
-                <!-- Сюда будут загружены карточки детей -->
-            </div>
-
-            <hr class="my-4">
-            <h5>⚡ Быстрые действия</h5>
-            <div class="d-flex gap-2">
-                <a href="/parent/documents" class="btn btn-outline-primary">📄 Документы</a>
-                <a href="/parent/events" class="btn btn-outline-success">📅 Мероприятия</a>
-            </div>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4>👨‍👩‍👧 Управление детьми</h4>
+        <div>
+            <button class="btn btn-sm btn-primary me-2" data-bs-toggle="modal" data-bs-target="#addChildModal">
+                <i class="bi bi-plus-circle"></i> Добавить
+            </button>
+            <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#linkChildModal">
+                <i class="bi bi-link"></i> Привязать
+            </button>
         </div>
+    </div>
 
-        <!-- Правая колонка: уведомления -->
-        <div class="col-lg-5">
-            <h5>🔔 Уведомления</h5>
-            <div id="notifications-list" class="list-group">
-                <!-- Сюда будут загружены уведомления -->
-            </div>
-        </div>
+    <div class="table-responsive">
+        <table class="table table-hover" id="childrenTable">
+            <thead>
+                <tr>
+                    <th>ФИО</th>
+                    <th>Класс</th>
+                    <th>Дата рождения</th>
+                    <th>Статус</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody id="childrenTableBody">
+                <!-- Загружается через JS -->
+            </tbody>
+        </table>
     </div>
 </div>
 
-<!-- Модальное окно: Добавить ребёнка -->
+<!-- Модальное окно: Добавить ребёнка (аналогично dashboard) -->
 <div class="modal fade" id="addChildModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -101,4 +94,4 @@
     </div>
 </div>
 
-<script src="/assets/js/parent-dashboard.js"></script>
+<script src="/assets/js/parent-children.js"></script>
