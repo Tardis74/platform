@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Хост: 127.0.0.1
--- Время создания: Авг 25 2026 г., 22:32
+-- Время создания: Авг 25 2026 г., 23:48
 -- Версия сервера: 10.4.27-MariaDB
 -- Версия PHP: 7.4.33
 
@@ -386,6 +386,13 @@ CREATE TABLE `parents` (
   `phone` varchar(20) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+--
+-- Дамп данных таблицы `parents`
+--
+
+INSERT INTO `parents` (`id`, `user_id`, `phone`) VALUES
+(4, 5, NULL);
+
 -- --------------------------------------------------------
 
 --
@@ -429,7 +436,8 @@ CREATE TABLE `rate_limits` (
 --
 
 INSERT INTO `rate_limits` (`ip`, `window_start`, `count`) VALUES
-('::1', 1787609901, 1);
+('127.0.0.1', 1787693116, 1),
+('127.0.0.1', 1787693126, 1);
 
 -- --------------------------------------------------------
 
@@ -484,7 +492,8 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `email`, `password_hash`, `role`, `full_name`, `created_at`, `updated_at`, `first_login`) VALUES
-(1, 'admin@example.com', '$2y$10$lQxdksaPab0v5LqkWfrRk.Fu1rl70qoRrrwyir7I0/ytwJREP3K5C', 'admin', 'Admin User', '2026-08-24 22:34:14', NULL, 1);
+(1, 'admin@example.com', '$2y$10$lQxdksaPab0v5LqkWfrRk.Fu1rl70qoRrrwyir7I0/ytwJREP3K5C', 'admin', 'Admin User', '2026-08-24 22:34:14', NULL, 1),
+(5, 'svelegzanin3@yandex.ru', '$2y$10$vu2D2Fx.DVywyXOu9LKfReNnIYTi57gtRW8fAowZKWfz7lqYMUZBC', 'parent', 'Велегжанин Сергей Олегович', '2026-08-25 21:18:25', NULL, 1);
 
 --
 -- Индексы сохранённых таблиц
@@ -817,7 +826,7 @@ ALTER TABLE `link_requests`
 -- AUTO_INCREMENT для таблицы `parents`
 --
 ALTER TABLE `parents`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT для таблицы `queue`
@@ -841,7 +850,7 @@ ALTER TABLE `teachers`
 -- AUTO_INCREMENT для таблицы `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- Ограничения внешнего ключа сохраненных таблиц

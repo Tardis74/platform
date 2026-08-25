@@ -19,7 +19,7 @@ abstract class BaseController
      * @return User|null
      * @throws RuntimeException
      */
-    protected function getCurrentUser(string $token): ?User
+    protected function getCurrentUser(string $token): ?array
     {
         $data = Auth::getUserFromToken($token, true);
         return $data['user'] ?? null;

@@ -1,14 +1,5 @@
-<IfModule mod_rewrite.c>
-    RewriteEngine On
-
-    # Запрет доступа к папкам
-    RewriteRule ^(app|config|storage|vendor)/ - [F,L]
-
-    # Если запрос не является существующим файлом или папкой, перенаправляем на api.php
-    RewriteCond %{REQUEST_FILENAME} !-f
-    RewriteCond %{REQUEST_FILENAME} !-d
-    RewriteRule ^ api.php [L]
-</IfModule>
-
-# Защита от просмотра содержимого директорий
-Options -Indexes
+RewriteEngine On
+# Если запрос не ведёт к существующему файлу или папке – перенаправить на index.php
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ index.php?route=$1 [L,QSA]

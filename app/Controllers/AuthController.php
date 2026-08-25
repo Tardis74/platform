@@ -4,6 +4,7 @@ namespace App\Controllers;
 
 use App\Core\DB;
 use App\Core\ApiResponse;
+use App\Core\Auth;
 use App\Models\User;
 use RuntimeException;
 
