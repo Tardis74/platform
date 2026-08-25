@@ -61,4 +61,15 @@ class LinkRequest
         }
         return $db->fetchAll($sql, $params);
     }
+
+    /**
+     * Одобрить все заявки для ученика.
+     */
+    public static function approveByStudent(int $studentId): void
+    {
+        $db = DB::getInstance();
+        $sql = "UPDATE link_requests SET status = 'approved', updated_at = NOW() 
+                WHERE student_id = :student_id AND status = 'pending'";
+        $db->query($sql, ['student_id' => $studentId]);
+    }
 }

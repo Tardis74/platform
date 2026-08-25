@@ -164,9 +164,11 @@ class ParentController extends BaseController
         $studentId = Student::create([
             'user_id'      => $studentUserId,
             'snils_hash'   => $snilsHash,
+            'snils_masked' => $snilsMasked,
             'class_id'     => $classId,
             'birth_date'   => $birthDate,
             'is_dormitory' => $isDormitory ? 1 : 0,
+            'status'       => 'awaiting_confirmation'
         ]);
 
         LinkRequest::create($parentId, $studentId, 'pending');

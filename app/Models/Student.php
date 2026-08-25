@@ -102,4 +102,65 @@ class Student
             ['class_id' => $classId]
         );
     }
+
+
+    /**
+     * Найти учеников класса, ожидающих подтверждения.
+     *
+     * @param int $classId
+     * @return array
+     */
+    public static function findPendingByClass(int $classId): array
+    {
+        $db = DB::getInstance();
+        return $db->fetchAll(
+            "SELECT s.id, u.full_name, s.birth_date, s.snils_masked, c.name as class_name, s.created_at
+             FROM students s
+             JOIN users u ON s.user_id = u.id
+             LEFT JOIN classes c ON s.class_id = c.id
+             WHERE s.class_id = :class_id AND s.status = 'awaiting_confirmation'
+             ORDER BY u.full_name",
+            ['class_id' => $classId]
+        );
+    }
+
+    /**
+     * Найти всех учеников, ожидающих подтверждения (для администратора).
+     *
+     * @return array
+     */
+    public static function findAllPending(): array
+    {
+        $db = DB::getInstance();
+        return $db->fetchAll(
+            "SELECT s.id, u.full_name, s.birth_date, s.snils_masked, c.name as class_name, s.class_id, s.created_at
+             FROM students s
+             JOIN users u ON s.user_id = u.id
+             LEFT JOIN classes c ON s.class_id = c.id
+             WHERE s.status = 'awaiting_confirmation'
+             ORDER BY u.full_name"
+        );
+    }
+
+    /**
+     * Подтвердить ученика (изменить статус на active).
+     */
+    public static function confirm(int $studentId): bool
+    {
+        $db = DB::getInstance();
+        $sql = "UPDATE students SET status = 'active' WHERE id = :id AND status = 'awaiting_confirmation'";
+        $stmt = $db->query($sql, ['id' => $studentId]);
+        return $stmt->rowCount() > 0;
+    }
+
+    /**
+     * Отклонить ученика (статус rejected, причина).
+     */
+    public static function reject(int $studentId, ?string $reason = null): bool
+    {
+        $db = DB::getInstance();
+        $sql = "UPDATE students SET status = 'rejected', rejection_reason = :reason WHERE id = :id AND status = 'awaiting_confirmation'";
+        $stmt = $db->query($sql, ['id' => $studentId, 'reason' => $reason]);
+        return $stmt->rowCount() > 0;
+    }
 }
