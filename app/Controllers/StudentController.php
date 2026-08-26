@@ -595,4 +595,152 @@ class StudentController extends BaseController
         $requests = LeaveRequest::getByStudent($student['id'], $status);
         return ApiResponse::success($requests);
     }
+    
+    /**
+     * Получить список мероприятий, на которые ученик записан (для календаря).
+     * Аналог eventMyRegistrations, но с именем getEvents.
+     */
+    public function getEvents(DB $db, array $payload): ApiResponse
+    {
+        // Перенаправляем на существующий метод
+        return $this->eventMyRegistrations($db, $payload);
+    }
+
+    /**
+     * Получить список доступных для записи мероприятий с фильтрацией.
+     */
+    public function getAvailableEvents(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) {
+            return ApiResponse::error('Token required.', 401);
+        }
+
+        try {
+            $this->requireRole($token, 'student');
+        } catch (RuntimeException $e) {
+            return ApiResponse::error($e->getMessage(), 403);
+        }
+
+        $user = $this->getCurrentUser($token);
+        if (!$user) {
+            return ApiResponse::error('User not found.', 404);
+        }
+
+        $student = Student::findByUserId($user['id']);
+        if (!$student) {
+            return ApiResponse::error('Student not found.', 404);
+        }
+
+        // Используем метод Event::list с фильтрацией по ученику
+        $filters = [
+            'start_date' => $payload['start_date'] ?? null,
+            'end_date'   => $payload['end_date'] ?? null,
+            'category_id' => isset($payload['category_id']) ? (int)$payload['category_id'] : null,
+            'status'     => 'active', // только активные
+            'page'       => isset($payload['page']) ? (int)$payload['page'] : 1,
+            'limit'      => isset($payload['limit']) ? (int)$payload['limit'] : 20,
+        ];
+        // Добавляем фильтр по регистрации: показываем только те, на которые не записан? 
+        // По ТЗ: "список доступных мероприятий" – т.е. все, где можно записаться.
+        // Event::list уже фильтрует по доступности для ученика (класс, общежитие).
+        $events = Event::list($filters, $user['id'], 'student', $student['id']);
+
+        return ApiResponse::success($events);
+    }
+
+    /**
+     * Получить список категорий достижений.
+     */
+    public function getAchievementCategories(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) {
+            return ApiResponse::error('Token required.', 401);
+        }
+        try {
+            $this->requireRole($token, 'student');
+        } catch (RuntimeException $e) {
+            return ApiResponse::error($e->getMessage(), 403);
+        }
+        // Просто возвращаем все категории
+        return ApiResponse::success(\App\Models\AchievementCategory::all());
+    }
+
+    /**
+     * Смена пароля ученика.
+     */
+    public function changePassword(DB $db, array $payload): ApiResponse
+    {
+        // Перенаправляем на метод AuthController::studentChangePassword, но он требует токен и роль.
+        // Чтобы не дублировать, можно вызвать через контейнер, но проще скопировать логику.
+        $token = $this->extractTokenFromHeader();
+        if (!$token) {
+            return ApiResponse::error('Token required.', 401);
+        }
+
+        try {
+            $this->requireRole($token, 'student');
+        } catch (RuntimeException $e) {
+            return ApiResponse::error($e->getMessage(), 403);
+        }
+
+        $user = $this->getCurrentUser($token);
+        if (!$user) {
+            return ApiResponse::error('User not found.', 404);
+        }
+
+        if (empty($payload['current_password']) || empty($payload['new_password'])) {
+            return ApiResponse::error('current_password and new_password are required.', 400);
+        }
+
+        if (strlen($payload['new_password']) < 6) {
+            return ApiResponse::error('New password must be at least 6 characters.', 400);
+        }
+
+        if (!User::checkPassword($payload['current_password'], $user['password_hash'])) {
+            return ApiResponse::error('Current password is incorrect.', 400);
+        }
+
+        User::updatePassword($user['id'], $payload['new_password']);
+
+        if ($user['first_login']) {
+            User::updateFirstLogin($user['id'], false);
+        }
+
+        $log = date('Y-m-d H:i:s') . " Student {$user['id']} changed password\n";
+        file_put_contents(__DIR__ . '/../../storage/logs/portfolio.log', $log, FILE_APPEND);
+
+        return ApiResponse::success(['message' => 'Пароль изменён']);
+    }
+
+    /**
+     * Получить место ученика в рейтинге (заглушка).
+     * Если рейтинг не реализован, возвращаем null.
+     */
+    public function getRatingPlace(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) {
+            return ApiResponse::error('Token required.', 401);
+        }
+        try {
+            $this->requireRole($token, 'student');
+        } catch (RuntimeException $e) {
+            return ApiResponse::error($e->getMessage(), 403);
+        }
+
+        $user = $this->getCurrentUser($token);
+        $student = Student::findByUserId($user['id']);
+        if (!$student) {
+            return ApiResponse::error('Student not found.', 404);
+        }
+
+        // Здесь можно реализовать вычисление места на основе total_points.
+        // Пока возвращаем заглушку.
+        return ApiResponse::success([
+            'place' => null, // или вычисленное значение
+            'total_points' => (int)$student['total_points'],
+        ]);
+    }
 }
