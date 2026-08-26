@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Хост: 127.0.0.1
--- Время создания: Авг 25 2026 г., 23:48
+-- Время создания: Авг 26 2026 г., 20:41
 -- Версия сервера: 10.4.27-MariaDB
 -- Версия PHP: 7.4.33
 
@@ -436,8 +436,10 @@ CREATE TABLE `rate_limits` (
 --
 
 INSERT INTO `rate_limits` (`ip`, `window_start`, `count`) VALUES
-('127.0.0.1', 1787693116, 1),
-('127.0.0.1', 1787693126, 1);
+('127.0.0.1', 1787695626, 8),
+('127.0.0.1', 1787695632, 2),
+('127.0.0.1', 1787695657, 2),
+('127.0.0.1', 1787695662, 6);
 
 -- --------------------------------------------------------
 
@@ -760,7 +762,7 @@ ALTER TABLE `canteen_special_meals`
 -- AUTO_INCREMENT для таблицы `classes`
 --
 ALTER TABLE `classes`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT для таблицы `consents`

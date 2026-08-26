@@ -384,4 +384,132 @@ class TeacherController extends BaseController
         $attendance = \App\Models\CanteenAttendance::getForClass($classId, $dateFrom, $dateTo);
         return ApiResponse::success($attendance);
     }
+
+    /**
+     * Получить статистику для дашборда.
+     */
+    public function getDashboardStats(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) return ApiResponse::error('Token required.', 401);
+        try { $this->requireRole($token, 'teacher'); } catch (RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
+
+        $user = $this->getCurrentUser($token);
+        $teacher = $db->fetch("SELECT class_id FROM teachers WHERE user_id = :user_id", ['user_id' => $user['id']]);
+        if (!$teacher || !$teacher['class_id']) {
+            return ApiResponse::error('У вас нет привязанного класса.', 404);
+        }
+        $classId = (int)$teacher['class_id'];
+
+        // Количество учеников
+        $studentsCount = (int)$db->fetch("SELECT COUNT(*) as cnt FROM students WHERE class_id = :class_id AND status = 'active'", ['class_id' => $classId])['cnt'];
+
+        // Ожидающие подтверждения
+        $pendingCount = (int)$db->fetch("SELECT COUNT(*) as cnt FROM students WHERE class_id = :class_id AND status = 'awaiting_confirmation'", ['class_id' => $classId])['cnt'];
+
+        // Заявления на выход сегодня
+        $today = date('Y-m-d');
+        $leaveToday = (int)$db->fetch("
+            SELECT COUNT(*) as cnt 
+            FROM leave_requests lr
+            JOIN students s ON lr.student_id = s.id
+            WHERE s.class_id = :class_id AND DATE(lr.start_time) = :today AND lr.status = 'pending'
+        ", ['class_id' => $classId, 'today' => $today])['cnt'];
+
+        // Мероприятия на текущую неделю
+        $weekStart = date('Y-m-d', strtotime('monday this week'));
+        $weekEnd = date('Y-m-d', strtotime('sunday this week'));
+        $eventsThisWeek = (int)$db->fetch("
+            SELECT COUNT(*) as cnt 
+            FROM event_class ec
+            JOIN events e ON ec.event_id = e.id
+            WHERE ec.class_id = :class_id AND DATE(e.start_datetime) BETWEEN :week_start AND :week_end AND e.status = 'active'
+        ", ['class_id' => $classId, 'week_start' => $weekStart, 'week_end' => $weekEnd])['cnt'];
+
+        // Название класса
+        $class = $db->fetch("SELECT name FROM classes WHERE id = :id", ['id' => $classId]);
+
+        return ApiResponse::success([
+            'class_name' => $class['name'] ?? '—',
+            'students_count' => $studentsCount,
+            'pending_count' => $pendingCount,
+            'leave_today' => $leaveToday,
+            'events_this_week' => $eventsThisWeek,
+        ]);
+    }
+
+    /**
+     * Получить список учеников класса (без подтверждения).
+     */
+    public function getStudents(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) return ApiResponse::error('Token required.', 401);
+        try { $this->requireRole($token, 'teacher'); } catch (RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
+
+        $user = $this->getCurrentUser($token);
+        $teacher = $db->fetch("SELECT class_id FROM teachers WHERE user_id = :user_id", ['user_id' => $user['id']]);
+        if (!$teacher || !$teacher['class_id']) {
+            return ApiResponse::error('У вас нет привязанного класса.', 404);
+        }
+        $classId = (int)$teacher['class_id'];
+
+        $students = Student::getByClass($classId);
+        return ApiResponse::success($students);
+    }
+
+    /**
+     * Получить достижения ученика с возможностью модерации (для учителя).
+     */
+    public function getStudentAchievements(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) return ApiResponse::error('Token required.', 401);
+        try { $this->requireRole($token, 'teacher'); } catch (RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
+
+        $user = $this->getCurrentUser($token);
+        $teacher = $db->fetch("SELECT class_id FROM teachers WHERE user_id = :user_id", ['user_id' => $user['id']]);
+        if (!$teacher || !$teacher['class_id']) {
+            return ApiResponse::error('У вас нет привязанного класса.', 404);
+        }
+        $classId = (int)$teacher['class_id'];
+
+        $studentId = (int)($payload['student_id'] ?? 0);
+        if ($studentId <= 0) {
+            return ApiResponse::error('student_id is required.', 400);
+        }
+
+        // Проверка, что ученик из класса учителя
+        $student = Student::find($studentId);
+        if (!$student || (int)$student['class_id'] !== $classId) {
+            return ApiResponse::error('Ученик не из вашего класса.', 403);
+        }
+
+        $categoryId = isset($payload['category_id']) ? (int)$payload['category_id'] : null;
+        $year = isset($payload['year']) ? (int)$payload['year'] : null;
+
+        $achievements = Achievement::getByStudent($studentId, $categoryId, $year);
+        return ApiResponse::success($achievements);
+    }
+
+    /**
+     * Получить заявления на выход учеников класса.
+     */
+    public function getLeaveRequests(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) return ApiResponse::error('Token required.', 401);
+        try { $this->requireRole($token, 'teacher'); } catch (RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
+
+        $user = $this->getCurrentUser($token);
+        $teacher = $db->fetch("SELECT class_id FROM teachers WHERE user_id = :user_id", ['user_id' => $user['id']]);
+        if (!$teacher || !$teacher['class_id']) {
+            return ApiResponse::error('У вас нет привязанного класса.', 404);
+        }
+        $classId = (int)$teacher['class_id'];
+
+        $status = $payload['status'] ?? null;
+        $requests = LeaveRequest::getByClass($classId, $status);
+        return ApiResponse::success($requests);
+    }
 }
