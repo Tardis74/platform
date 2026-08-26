@@ -1402,6 +1402,86 @@ URL: /api.php?method=system.checkExpiredDocuments
 
 Ответ: {date, present_count, total_students, special_meals: [...]}.
 
+###teacher.getDashboardStats – получение статистики для главной страницы классного руководителя.
+Метод: GET  
+URL: /api.php?method=teacher.getDashboardStats  
+Параметры: отсутствуют (класс определяется по текущему учителю).  
+Ответ (200):
+{
+  "success": true,
+  "data": {
+    "class_name": "10А",
+    "students_count": 25,
+    "pending_count": 3,
+    "leave_today": 1,
+    "events_this_week": 2
+  }
+}
+Ошибки: 404 – у учителя нет привязанного класса.
+
+###teacher.getStudents – получить список всех учеников класса (активных, без ожидающих подтверждения).
+Метод: GET  
+URL: /api.php?method=teacher.getStudents  
+Параметры: отсутствуют.  
+Ответ (200):
+{
+  "success": true,
+  "data": [
+    { "id": 1, "full_name": "Иванов Иван", "class_id": 1, "status": "active" },
+    { "id": 2, "full_name": "Петров Пётр", "class_id": 1, "status": "active" }
+  ]
+}
+Ошибки: 404 – у учителя нет привязанного класса.
+
+###teacher.getStudentAchievements – получить достижения конкретного ученика с возможностью модерации (для учителя).
+Метод: GET  
+URL: /api.php?method=teacher.getStudentAchievements  
+Параметры URL (обязательные):
+- student_id (int) – ID ученика
+- category_id (int, опционально) – фильтр по категории
+- year (int, опционально) – фильтр по году
+
+Ответ (200):
+{
+  "success": true,
+  "data": [
+    {
+      "id": 10,
+      "title": "Победитель олимпиады",
+      "category_name": "Олимпиада",
+      "status": "pending",
+      "points": 10,
+      "created_at": "2026-08-25 10:00:00",
+      "file_url": "/api.php?method=achievement.download&id=10"
+    }
+  ]
+}
+Примечание: учитель может видеть все достижения учеников своего класса, включая ожидающие, и может их подтверждать/отклонять (через методы moderator.confirmAchievement и moderator.rejectAchievement). Этот метод возвращает те же данные, что и achievement.list, но для указанного ученика и с дополнительной проверкой прав (ученик должен быть из класса учителя).
+
+###teacher.getLeaveRequests – получить заявления на выход учеников класса с фильтром по статусу.
+Метод: GET  
+URL: /api.php?method=teacher.getLeaveRequests  
+Параметры URL (опционально):
+- status (string) – фильтр по статусу (pending, approved, rejected, exited, returned, overdue)
+
+Ответ (200):
+{
+  "success": true,
+  "data": [
+    {
+      "id": 5,
+      "student_id": 1,
+      "student_name": "Иванов Иван",
+      "class_name": "10А",
+      "start_time": "2026-08-26 14:00:00",
+      "end_time": "2026-08-26 18:00:00",
+      "status": "pending",
+      "created_at": "2026-08-26 12:00:00"
+    }
+  ]
+}
+Ошибки: 404 – у учителя нет привязанного класса.
+
 ##Администратор
 ###admin.canteen.special.add – добавить особый график питания.
 
