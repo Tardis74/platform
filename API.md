@@ -397,6 +397,921 @@ URL: /api.php?method=teacher.rejectStudent
 
 ##Административные методы (админ/модератор)
 
+###admin.getDashboardStats
+Возвращает обзорную статистику для главной страницы администратора.
+Метод: GET
+URL: /api.php?method=admin.getDashboardStats
+Ответ (200):
+{
+"success": true,
+"data": {
+"total_users": 150,
+"admins": 2,
+"teachers": 10,
+"parents": 80,
+"students": 55,
+"moderators": 3,
+"active_students": 50,
+"classes": 8,
+"events": 12,
+"documents": 45
+}
+}
+Ошибки: 403 – недостаточно прав.
+
+###admin.user.list
+Получение списка пользователей с фильтрацией, пагинацией и сортировкой.
+Метод: GET
+URL: /api.php?method=admin.user.list
+Параметры URL (опционально):
+page – номер страницы (по умолчанию 1)
+limit – записей на страницу (по умолчанию 20, максимум 100)
+role – фильтр по роли (admin, teacher, parent, student, moderator)
+status – фильтр по статусу (active, blocked)
+search – поиск по ФИО или email (частичное совпадение)
+sort_by – поле для сортировки (id, full_name, email, role, created_at, status)
+order – направление (asc, desc, по умолчанию asc)
+Ответ (200):
+{
+"success": true,
+"data": {
+"items": [
+{
+"id": 1,
+"full_name": "Иванов Иван Иванович",
+"email": "ivan@example.com",
+"role": "admin",
+"status": "active",
+"created_at": "2026-08-24 10:00:00"
+}
+],
+"total": 150,
+"page": 1,
+"limit": 20
+}
+}
+Ошибки: 403 – недостаточно прав.
+
+###admin.user.get
+Получение данных одного пользователя по ID.
+Метод: GET
+URL: /api.php?method=admin.user.get
+Параметры URL:
+id (int, обязательное) – ID пользователя
+Ответ (200):
+{
+"success": true,
+"data": {
+"id": 1,
+"full_name": "Иванов Иван Иванович",
+"email": "ivan@example.com",
+"role": "admin",
+"status": "active",
+"created_at": "2026-08-24 10:00:00"
+}
+}
+Ошибки: 400 – id не указан; 404 – пользователь не найден.
+
+###admin.user.create
+Создание нового пользователя.
+Метод: POST
+URL: /api.php?method=admin.user.create
+Тело (JSON):
+{
+"full_name": "Петров Пётр Петрович",
+"email": "petrov@example.com",
+"password": "secure_password",
+"role": "teacher"
+}
+Допустимые роли: student, teacher, parent, moderator, admin.
+Ответ (200):
+{
+"success": true,
+"data": {
+"id": 10,
+"message": "Пользователь создан"
+}
+}
+Ошибки: 400 – не заполнены обязательные поля; 409 – email уже занят; 403 – недостаточно прав.
+
+###admin.user.update
+Обновление данных пользователя. Можно также сбросить пароль (будет сгенерирован автоматически).
+Метод: POST
+URL: /api.php?method=admin.user.update
+Тело (JSON):
+{
+"id": 10,
+"full_name": "Новое ФИО",
+"email": "newemail@example.com",
+"role": "moderator",
+"reset_password": true
+}
+Ответ (200):
+{
+"success": true,
+"data": {
+"message": "Пользователь обновлён",
+"new_password": "a1b2c3d4"
+}
+}
+Ошибки: 400 – id не указан или нет полей для обновления; 404 – пользователь не найден; 409 – email занят другим пользователем.
+
+###admin.user.delete
+Мягкое удаление пользователя (устанавливается deleted_at).
+Метод: POST
+URL: /api.php?method=admin.user.delete
+Тело (JSON):
+{
+"id": 10
+}
+Ответ (200):
+{
+"success": true,
+"data": {
+"message": "Пользователь удалён"
+}
+}
+Ошибки: 400 – id не указан; 404 – пользователь не найден.
+
+###admin.user.toggleStatus
+Блокировка или разблокировка пользователя.
+Метод: POST
+URL: /api.php?method=admin.user.toggleStatus
+Тело (JSON):
+{
+"id": 10,
+"action": "block"
+}
+Ответ (200):
+{
+"success": true,
+"data": {
+"status": "blocked",
+"message": "Пользователь заблокирован"
+}
+}
+Ошибки: 400 – id или action не указаны; 404 – пользователь не найден.
+
+###admin.user.search
+Поиск пользователей по ФИО или email (используется для выпадающих списков).
+Метод: GET
+URL: /api.php?method=admin.user.search
+Параметры URL:
+query (string, обязательное) – строка поиска (минимум 2 символа)
+limit (опционально, по умолчанию 10)
+Ответ (200):
+{
+"success": true,
+"data": [
+{
+"id": 1,
+"full_name": "Иванов Иван",
+"email": "ivan@example.com"
+}
+]
+}
+
+###admin.user.import
+Массовый импорт пользователей из CSV. Процесс двухэтапный: сначала предпросмотр, затем подтверждение.
+Шаг 1 – предпросмотр:
+Метод: POST (multipart/form-data)
+URL: /api.php?method=admin.user.importPreview
+Параметры формы:
+file (файл, обязательное) – CSV-файл с заголовками: full_name, email, role, password (опционально), для учеников дополнительные поля: snils, class_name, birth_date, is_dormitory.
+Ответ (200):
+{
+"success": true,
+"data": {
+"html": "<table>...</table>",
+"data": []
+}
+}
+Шаг 2 – подтверждение импорта:
+Метод: POST
+URL: /api.php?method=admin.user.import
+Тело (JSON):
+{
+"data": []
+}
+Ответ (200):
+{
+"success": true,
+"data": {
+"imported": 10,
+"errors": 0,
+"message": "Импорт выполнен"
+}
+}
+Ошибки: 400 – не передан файл или данные; 403 – недостаточно прав.
+
+###admin.class.list
+Список классов с возможностью фильтрации по учебному году.
+Метод: GET
+URL: /api.php?method=admin.class.list
+Параметры URL (опционально):
+academic_year_id – фильтр по году
+page, limit – пагинация
+Ответ (200):
+{
+"success": true,
+"data": [
+{
+"id": 1,
+"name": "10А",
+"academic_year_id": 1,
+"academic_year_name": "2026-2027",
+"teacher_id": 5,
+"teacher_name": "Иванова Мария Петровна",
+"student_count": 25,
+"is_archived": false
+}
+]
+}
+
+###admin.class.create
+Создание нового класса.
+Метод: POST
+URL: /api.php?method=admin.class.create
+Тело (JSON):
+{
+"name": "10Б",
+"academic_year_id": 1,
+"teacher_id": 6
+}
+Ответ (200):
+{
+"success": true,
+"data": {
+"id": 2,
+"message": "Класс создан"
+}
+}
+
+###admin.class.update
+Обновление класса (можно изменить название или классного руководителя).
+Метод: POST
+URL: /api.php?method=admin.class.update
+Тело (JSON):
+{
+"id": 2,
+"name": "10В",
+"teacher_id": 7
+}
+Ответ (200):
+{
+"success": true,
+"data": {
+"message": "Класс обновлён"
+}
+}
+
+###admin.class.archive
+Архивирование класса (установка флага is_archived).
+Метод: POST
+URL: /api.php?method=admin.class.archive
+Тело (JSON):
+{
+"id": 2,
+"archived": true
+}
+Ответ (200):
+{
+"success": true,
+"data": {
+"message": "Класс архивирован"
+}
+}
+
+###admin.class.students
+Получение списка учеников класса с возможностью ручной корректировки статуса.
+Метод: GET
+URL: /api.php?method=admin.class.students
+Параметры URL:
+class_id (int, обязательное)
+Ответ (200):
+{
+"success": true,
+"data": [
+{
+"id": 1,
+"full_name": "Иванов Иван",
+"status": "active",
+"snils_masked": "123***789"
+}
+]
+}
+
+###admin.class.updateStudentStatus
+Ручная корректировка статуса ученика в классе.
+Метод: POST
+URL: /api.php?method=admin.class.updateStudentStatus
+Тело (JSON):
+{
+"student_id": 1,
+"status": "graduated"
+}
+Ответ (200):
+{
+"success": true,
+"data": {
+"message": "Статус ученика обновлён"
+}
+}
+
+###admin.academicYear.list
+Список учебных годов.
+Метод: GET
+URL: /api.php?method=admin.academicYear.list
+Ответ (200):
+{
+"success": true,
+"data": [
+{
+"id": 1,
+"name": "2026-2027",
+"start_date": "2026-09-01",
+"end_date": "2027-05-31",
+"is_current": true
+}
+]
+}
+
+###admin.academicYear.create
+Создание нового учебного года.
+Метод: POST
+URL: /api.php?method=admin.academicYear.create
+Тело (JSON):
+{
+"name": "2027-2028",
+"start_date": "2027-09-01",
+"end_date": "2028-05-31",
+"is_current": false
+}
+Ответ (200):
+{
+"success": true,
+"data": {
+"id": 2,
+"message": "Учебный год создан"
+}
+}
+
+###admin.academicYear.update
+Обновление учебного года.
+Метод: POST
+URL: /api.php?method=admin.academicYear.update
+Тело (JSON):
+{
+"id": 2,
+"name": "2027-2028 (обновлён)",
+"is_current": true
+}
+Ответ (200):
+{
+"success": true,
+"data": {
+"message": "Учебный год обновлён"
+}
+}
+
+###admin.academicYear.transfer
+Массовый перевод учеников из одного класса в другой.
+Метод: POST
+URL: /api.php?method=admin.academicYear.transfer
+Тело (JSON):
+{
+"from_class_id": 1,
+"to_class_id": 2
+}
+Ответ (200):
+{
+"success": true,
+"data": {
+"transferred_count": 25,
+"message": "Ученики переведены"
+}
+}
+
+###admin.tag.assign
+Назначение одного или нескольких тегов конкретному ученику.
+Метод: POST
+URL: /api.php?method=admin.tag.assign
+Тело (JSON):
+{
+"student_id": 1,
+"tag_ids": [3, 5, 7]
+}
+Ответ (200):
+{
+"success": true,
+"data": {
+"message": "Теги назначены"
+}
+}
+
+###admin.tag.assignMass
+Массовое назначение тегов всем ученикам указанного класса.
+Метод: POST
+URL: /api.php?method=admin.tag.assignMass
+Тело (JSON):
+{
+"class_id": 1,
+"tag_ids": [3, 5]
+}
+Ответ (200):
+{
+"success": true,
+"data": {
+"assigned_count": 25,
+"message": "Теги назначены всем ученикам класса"
+}
+}
+
+###admin.template.get
+Получение шаблона по ID.
+Метод: GET
+URL: /api.php?method=admin.template.get
+Параметры URL:
+id (int, обязательное)
+Ответ (200): полный объект шаблона.
+
+###admin.achievementCategory.list
+Список категорий достижений.
+Метод: GET
+URL: /api.php?method=admin.achievementCategory.list
+Ответ (200):
+{
+"success": true,
+"data": [
+{
+"id": 1,
+"name": "Олимпиада",
+"weight": 10,
+"created_at": "2026-08-25 10:00:00"
+}
+]
+}
+
+###admin.achievementCategory.create
+Создание категории достижений.
+Метод: POST
+URL: /api.php?method=admin.achievementCategory.create
+Тело (JSON):
+{
+"name": "Научные проекты",
+"weight": 8
+}
+Ответ (200):
+{
+"success": true,
+"data": {
+"id": 4,
+"message": "Категория создана"
+}
+}
+
+###admin.achievementCategory.update
+Обновление категории.
+Метод: POST
+URL: /api.php?method=admin.achievementCategory.update
+Тело (JSON):
+{
+"id": 4,
+"name": "Исследовательские работы",
+"weight": 12
+}
+Ответ (200):
+{
+"success": true,
+"data": {
+"message": "Категория обновлена"
+}
+}
+
+###admin.achievementCategory.delete
+Удаление категории (если не используется).
+Метод: POST
+URL: /api.php?method=admin.achievementCategory.delete
+Тело (JSON):
+{
+"id": 4
+}
+Ответ (200):
+{
+"success": true,
+"data": {
+"message": "Категория удалена"
+}
+}
+
+###admin.report.generate
+Постановка отчёта в очередь на генерацию.
+Метод: POST
+URL: /api.php?method=admin.report.generate
+Тело (JSON):
+{
+"type": "events",
+"date_from": "2026-08-01",
+"date_to": "2026-08-31",
+"class_ids": [1, 2],
+"student_ids": [10, 20],
+"event_ids": [5, 6]
+}
+Ответ (200):
+{
+"success": true,
+"data": {
+"job_id": "abc123",
+"message": "Отчёт поставлен в очередь"
+}
+}
+Ошибки: 400 – не указан type; 403 – недостаточно прав.
+
+###admin.report.status
+Проверка статуса готовности отчёта.
+Метод: GET
+URL: /api.php?method=admin.report.status
+Параметры URL:
+job_id (string, обязательное) – идентификатор задачи
+Ответ (200):
+{
+"success": true,
+"data": {
+"status": "ready",
+"download_url": "/api.php?method=admin.report.download&job_id=abc123"
+}
+}
+Ошибки: 400 – job_id не указан; 404 – задача не найдена.
+
+###admin.report.download
+Скачивание готового отчёта.
+Метод: GET
+URL: /api.php?method=admin.report.download
+Параметры URL:
+job_id (string, обязательное)
+Ответ: файл отдаётся напрямую с заголовками Content-Disposition: attachment. Поддерживаются форматы Excel (.xlsx) и PDF (.pdf) в зависимости от типа отчёта.
+Ошибки: 400 – job_id не указан; 404 – отчёт не найден или не готов.
+
+###admin.report.history
+История ранее сгенерированных отчётов.
+Метод: GET
+URL: /api.php?method=admin.report.history
+Параметры URL (опционально):
+page, limit – пагинация
+Ответ (200):
+{
+"success": true,
+"data": [
+{
+"id": 1,
+"type": "events",
+"status": "ready",
+"created_at": "2026-08-25 14:30:00",
+"download_url": "/api.php?method=admin.report.download&job_id=abc123"
+}
+]
+}
+
+###admin.student.find
+Поиск ученика по ФИО или классу для просмотра портфолио.
+Метод: GET
+URL: /api.php?method=admin.student.find
+Параметры URL:
+query (string, обязательное) – строка поиска
+Ответ (200):
+{
+"success": true,
+"data": {
+"id": 1,
+"full_name": "Иванов Иван",
+"class_name": "10А",
+"total_points": 45
+}
+}
+
+###admin.student.achievements
+Получение всех достижений ученика (для просмотра и модерации).
+Метод: GET
+URL: /api.php?method=admin.student.achievements
+Параметры URL:
+student_id (int, обязательное)
+category_id (опционально) – фильтр по категории
+year (опционально) – фильтр по году
+Ответ (200):
+{
+"success": true,
+"data": [
+{
+"id": 10,
+"title": "Победитель олимпиады",
+"category_name": "Олимпиада",
+"weight": 10,
+"status": "pending",
+"created_at": "2026-08-25 10:00:00",
+"file_url": "/api.php?method=achievement.download&id=10"
+}
+]
+}
+
+###admin.achievement.confirm
+Подтверждение достижения администратором (начисляет баллы).
+Метод: POST
+URL: /api.php?method=admin.achievement.confirm
+Тело (JSON):
+{
+"achievement_id": 10
+}
+Ответ (200):
+{
+"success": true,
+"data": {
+"message": "Достижение подтверждено",
+"points_added": 10
+}
+}
+
+###admin.achievement.reject
+Отклонение достижения администратором.
+Метод: POST
+URL: /api.php?method=admin.achievement.reject
+Тело (JSON):
+{
+"achievement_id": 10,
+"reason": "Недостаточно подтверждений"
+}
+Ответ (200):
+{
+"success": true,
+"data": {
+"message": "Достижение отклонено"
+}
+}
+
+###admin.achievement.updatePoints
+Ручное изменение баллов ученика (для корректировки).
+Метод: POST
+URL: /api.php?method=admin.achievement.updatePoints
+Тело (JSON):
+{
+"student_id": 1,
+"points": 5
+}
+Ответ (200):
+{
+"success": true,
+"data": {
+"new_total": 50,
+"message": "Баллы обновлены"
+}
+}
+
+###admin.rating.build
+Построение обезличенного рейтинга учеников.
+Метод: POST
+URL: /api.php?method=admin.rating.build
+Тело (JSON):
+{
+"period": "2026-08",
+"class_ids": [1, 2],
+"category_ids": [1, 3]
+}
+Ответ (200):
+{
+"success": true,
+"data": {
+"rating_id": 5,
+"items": [
+{
+"student_id": 1,
+"identifier": "STU_001",
+"points": 45,
+"comment": ""
+}
+]
+}
+}
+
+###admin.rating.publish
+Публикация обезличенного рейтинга (делает его доступным для учеников).
+Метод: POST
+URL: /api.php?method=admin.rating.publish
+Тело (JSON):
+{
+"rating_id": 5,
+"comments": {
+"1": "Рекомендован к зачислению",
+"2": "Успехи в спорте"
+}
+}
+Ответ (200):
+{
+"success": true,
+"data": {
+"message": "Рейтинг опубликован"
+}
+}
+
+###admin.rating.unpublish
+Снятие публикации рейтинга.
+Метод: POST
+URL: /api.php?method=admin.rating.unpublish
+Тело (JSON):
+{
+"rating_id": 5
+}
+Ответ (200):
+{
+"success": true,
+"data": {
+"message": "Публикация снята"
+}
+}
+
+###admin.rating.setVisibility
+Управление видимостью места в личном кабинете ученика.
+Метод: POST
+URL: /api.php?method=admin.rating.setVisibility
+Тело (JSON):
+{
+"show": true
+}
+Ответ (200):
+{
+"success": true,
+"data": {
+"message": "Настройка обновлена"
+}
+}
+
+###admin.permissions.get
+Получение текущих прав пользователя (роль или список разрешений).
+Метод: GET
+URL: /api.php?method=admin.permissions.get
+Параметры URL:
+user_id (int, обязательное)
+Ответ (200) если назначена стандартная роль:
+{
+"success": true,
+"data": {
+"role": "teacher"
+}
+}
+Ответ (200) если назначены персональные права:
+{
+"success": true,
+"data": {
+"permissions": ["event_create", "event_edit", "document_verify"]
+}
+}
+
+###admin.permissions.listAll
+Возвращает все доступные разрешения, сгруппированные по функциональным блокам.
+Метод: GET
+URL: /api.php?method=admin.permissions.listAll
+Ответ (200):
+{
+"success": true,
+"data": [
+{
+"id": "event_create",
+"name": "Создание мероприятий",
+"group": "Мероприятия"
+},
+{
+"id": "event_confirm",
+"name": "Подтверждение мероприятий",
+"group": "Мероприятия"
+},
+{
+"id": "document_verify",
+"name": "Проверка документов",
+"group": "Документы"
+}
+]
+}
+
+###admin.permissions.set
+Назначение прав пользователю (либо стандартная роль, либо список персональных разрешений).
+Метод: POST
+URL: /api.php?method=admin.permissions.set
+Тело (JSON) вариант 1 – назначение роли:
+{
+"user_id": 10,
+"role": "moderator"
+}
+Тело (JSON) вариант 2 – назначение персональных прав:
+{
+"user_id": 10,
+"permissions": ["event_create", "event_edit"]
+}
+Ответ (200):
+{
+"success": true,
+"data": {
+"message": "Права назначены"
+}
+}
+Ошибки: 400 – не указан user_id или не передан ни role, ни permissions; 403 – недостаточно прав.
+
+###admin.audit.list
+Получение списка событий с фильтрацией и пагинацией.
+Метод: GET
+URL: /api.php?method=admin.audit.list
+Параметры URL (опционально):
+page, limit – пагинация
+date_from – дата начала (YYYY-MM-DD)
+date_to – дата окончания (YYYY-MM-DD)
+user – поиск по ФИО пользователя (частичное совпадение)
+event_type – тип события (список возможных значений см. ниже)
+Возможные типы событий:
+login, logout, user_create, user_update, user_delete, role_change, permission_change,
+class_create, class_update, class_archive, tag_create, tag_update, tag_delete,
+template_create, template_update, template_delete, category_create, category_update,
+category_delete, report_generate, report_download, rating_publish, rating_unpublish,
+student_confirm, student_reject, achievement_confirm, achievement_reject.
+Ответ (200):
+{
+"success": true,
+"data": {
+"items": [
+{
+"id": 1,
+"created_at": "2026-08-25 14:30:00",
+"user_id": 1,
+"user_name": "Иванов Иван",
+"ip_address": "192.168.1.1",
+"event_type": "user_update",
+"object_change": "Пользователь #10: смена роли с teacher на moderator"
+}
+],
+"total": 150,
+"page": 1,
+"limit": 20
+}
+}
+
+###admin.audit.export
+Экспорт журнала аудита по текущим фильтрам в CSV.
+Метод: GET
+URL: /api.php?method=admin.audit.export
+Параметры URL: такие же, как у admin.audit.list (date_from, date_to, user, event_type).
+Ответ: файл CSV с заголовками: Дата, Пользователь, IP, Тип события, Объект изменения.
+
+###admin.student.portfolio
+Просмотр полного портфолио ученика (все достижения, документы, мероприятия).
+Метод: GET
+URL: /api.php?method=admin.student.portfolio
+Параметры URL:
+student_id (int, обязательное)
+Ответ (200):
+{
+"success": true,
+"data": {
+"student": {
+"id": 1,
+"full_name": "Иванов Иван",
+"class_name": "10А",
+"total_points": 45
+},
+"achievements": [],
+"documents": [],
+"events": []
+}
+}
+
+###admin.student.list
+Получение списка учеников с фильтром по классу (используется для выпадающих списков).
+Метод: GET
+URL: /api.php?method=admin.student.list
+Параметры URL (опционально):
+class_ids – массив ID классов (фильтр)
+search – поиск по ФИО
+Ответ (200):
+{
+"success": true,
+"data": [
+{
+"id": 1,
+"full_name": "Иванов Иван",
+"class_name": "10А"
+}
+]
+}
+
+Важные замечания:
+
+Все методы возвращают стандартный формат { success, data, error }.
+
+Для загрузки файлов (CSV, достижения, документы) используется multipart/form-data.
+
+Пагинация осуществляется через параметры page и limit (максимальный лимит – 100).
+
+Все действия логируются в таблицу audit_logs (кроме публичных методов).
+
+Роли пользователей: admin, teacher, parent, student, moderator, canteen, kpp.
+
+Все методы администратора доступны только роли admin.
+
 ###admin.getAllPendingStudents
 Все ученики, ожидающие подтверждения (для администратора).
 
@@ -443,7 +1358,168 @@ URL: /api.php?method=admin.rejectStudentByAdmin
 }
 }
 
-##Модерация достижений (модератор/администратор)
+##Модерация достижений и документов (модератор/администратор)
+
+###moderator.getPendingDocuments
+
+Возвращает список документов, ожидающих проверки (статус pending). Доступно для ролей moderator, admin, teacher (для учителя – только документы учеников его класса).
+
+Метод: GET
+URL: /api.php?method=moderator.getPendingDocuments
+Параметры URL (опционально):
+
+student_id – фильтр по ученику
+
+template_id – фильтр по шаблону
+
+Ответ (200):
+{
+"success": true,
+"data": [
+{
+"id": 10,
+"student_id": 1,
+"student_name": "Иванов Иван",
+"class_name": "10А",
+"template_id": 3,
+"template_name": "Согласие на обработку данных",
+"uploaded_by": 5,
+"uploaded_by_name": "Петрова Мария",
+"status": "pending",
+"file_url": "/api.php?method=document.download&id=10",
+"created_at": "2026-08-25 12:00:00"
+}
+]
+}
+
+###moderator.confirmDocument
+
+Подтверждает документ (переводит в статус approved).
+
+Метод: POST
+URL: /api.php?method=moderator.confirmDocument
+Тело (JSON):
+{
+"document_id": 10,
+"comment": "Принято"
+}
+
+Ответ (200):
+{
+"success": true,
+"data": {
+"document_id": 10,
+"status": "approved"
+}
+}
+
+Ошибки: 400 – document_id не указан; 404 – документ не найден; 409 – документ не в статусе pending.
+
+###moderator.rejectDocument
+
+Отклоняет документ с обязательным комментарием (статус rejected).
+
+Метод: POST
+URL: /api.php?method=moderator.rejectDocument
+Тело (JSON):
+{
+"document_id": 10,
+"comment": "Недостаточно подтверждающих документов"
+}
+
+Ответ (200):
+{
+"success": true,
+"data": {
+"document_id": 10,
+"status": "rejected"
+}
+}
+
+Ошибки: 400 – отсутствует comment; 404 – документ не найден; 409 – документ не в статусе pending.
+
+##Дашборд модератора
+
+###moderator.getDashboardStats
+
+Возвращает сводную статистику для главной страницы модератора. Доступно для ролей moderator и admin.
+
+Метод: GET
+URL: /api.php?method=moderator.getDashboardStats
+
+Ответ (200):
+{
+"success": true,
+"data": {
+"pending_documents": 5,
+"pending_achievements": 3,
+"pending_registrations": 7
+}
+}
+
+##Справочники для форм мероприятий
+
+###admin.classList
+
+Возвращает список всех классов. Используется для заполнения выпадающих списков в формах создания/редактирования мероприятий. Доступно для авторизованных пользователей с ролями admin, moderator, teacher.
+
+Метод: GET
+URL: /api.php?method=admin.classList
+
+Ответ (200):
+{
+"success": true,
+"data": [
+{ "id": 1, "name": "10А", "year": 2026 },
+{ "id": 2, "name": "10Б", "year": 2026 }
+]
+}
+
+##Детали мероприятия
+
+###event.get
+
+Возвращает полную информацию о мероприятии, включая списки классов, тегов и типов проживания. Для ученика также возвращается статус его заявки. Доступно для всех авторизованных ролей.
+
+Метод: GET
+URL: /api.php?method=event.get
+Параметры URL:
+
+event_id (int, обязательное) – ID мероприятия
+
+Ответ (200):
+{
+"success": true,
+"data": {
+"id": 1,
+"title": "Олимпиада по математике",
+"description": "Муниципальный этап",
+"start_datetime": "2026-09-15 10:00:00",
+"end_datetime": "2026-09-15 14:00:00",
+"location": "Актовый зал",
+"category_id": 1,
+"category_name": "Олимпиады",
+"max_participants": 50,
+"current_count": 10,
+"points": 10,
+"requires_confirmation": true,
+"requires_documents": false,
+"status": "active",
+"created_by": 5,
+"tags": [
+{ "id": 3, "name": "Математика" },
+{ "id": 5, "name": "Олимпиада" }
+],
+"class_access": [
+{ "id": 1, "name": "10А" },
+{ "id": 2, "name": "10Б" }
+],
+"dormitory_access": [true, false],
+"registration_status": "pending"
+}
+}
+
+Примечание: для модератора (роль moderator) методы event.list, event.create, event.update, event.delete доступны без ограничений по классу – модератор видит и управляет всеми мероприятиями платформы.
 
 ###moderator.getPendingAchievements
 Список достижений на проверке.

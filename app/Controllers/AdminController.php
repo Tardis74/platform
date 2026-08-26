@@ -600,4 +600,50 @@ class AdminController extends BaseController
         }
         return ApiResponse::success(\App\Models\SchoolClass::all());
     }
+
+    public function getDashboardStats(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) {
+            return ApiResponse::error('Token required.', 401);
+        }
+        try {
+            $this->requireRole($token, 'admin');
+        } catch (RuntimeException $e) {
+            return ApiResponse::error($e->getMessage(), 403);
+        }
+
+        // Общее количество пользователей
+        $totalUsers = (int)$db->fetch("SELECT COUNT(*) as cnt FROM users WHERE deleted_at IS NULL")['cnt'];
+        $admins = (int)$db->fetch("SELECT COUNT(*) as cnt FROM users WHERE role = 'admin' AND deleted_at IS NULL")['cnt'];
+        $teachers = (int)$db->fetch("SELECT COUNT(*) as cnt FROM users WHERE role = 'teacher' AND deleted_at IS NULL")['cnt'];
+        $parents = (int)$db->fetch("SELECT COUNT(*) as cnt FROM users WHERE role = 'parent' AND deleted_at IS NULL")['cnt'];
+        $students = (int)$db->fetch("SELECT COUNT(*) as cnt FROM users WHERE role = 'student' AND deleted_at IS NULL")['cnt'];
+        $moderators = (int)$db->fetch("SELECT COUNT(*) as cnt FROM users WHERE role = 'moderator' AND deleted_at IS NULL")['cnt'];
+
+        // Активные ученики (статус active в таблице students)
+        $activeStudents = (int)$db->fetch("SELECT COUNT(*) as cnt FROM students WHERE status = 'active'")['cnt'];
+
+        // Классы
+        $classes = (int)$db->fetch("SELECT COUNT(*) as cnt FROM classes WHERE is_archived = 0")['cnt'];
+
+        // Мероприятия (активные)
+        $events = (int)$db->fetch("SELECT COUNT(*) as cnt FROM events WHERE status = 'active'")['cnt'];
+
+        // Документы (всего)
+        $documents = (int)$db->fetch("SELECT COUNT(*) as cnt FROM documents")['cnt'];
+
+        return ApiResponse::success([
+            'total_users' => $totalUsers,
+            'admins' => $admins,
+            'teachers' => $teachers,
+            'parents' => $parents,
+            'students' => $students,
+            'moderators' => $moderators,
+            'active_students' => $activeStudents,
+            'classes' => $classes,
+            'events' => $events,
+            'documents' => $documents,
+        ]);
+    }
 }

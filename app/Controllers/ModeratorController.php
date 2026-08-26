@@ -409,4 +409,42 @@ class ModeratorController extends BaseController
 
         return ApiResponse::success(['document_id' => $documentId, 'status' => 'rejected']);
     }
+
+    /**
+     * Возвращает статистику для дашборда модератора.
+     */
+    public function getDashboardStats(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) {
+            return ApiResponse::error('Token required.', 401);
+        }
+
+        try {
+            $this->requireRole($token, ['moderator', 'admin']);
+        } catch (RuntimeException $e) {
+            return ApiResponse::error($e->getMessage(), 403);
+        }
+
+        // Количество документов на проверке
+        $pendingDocuments = (int)$db->fetch(
+            "SELECT COUNT(*) as cnt FROM documents WHERE status = 'pending'"
+        )['cnt'];
+
+        // Количество достижений на проверке
+        $pendingAchievements = (int)$db->fetch(
+            "SELECT COUNT(*) as cnt FROM achievements WHERE status = 'pending'"
+        )['cnt'];
+
+        // Количество заявок на мероприятия на проверке
+        $pendingRegistrations = (int)$db->fetch(
+            "SELECT COUNT(*) as cnt FROM event_registrations WHERE status = 'pending'"
+        )['cnt'];
+
+        return ApiResponse::success([
+            'pending_documents'      => $pendingDocuments,
+            'pending_achievements'   => $pendingAchievements,
+            'pending_registrations'  => $pendingRegistrations,
+        ]);
+    }
 }

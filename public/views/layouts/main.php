@@ -26,10 +26,44 @@
                         <li class="nav-item"><a class="nav-link" href="/student/dashboard">Дашборд</a></li>
                         <li class="nav-item"><a class="nav-link" href="/student/events">Мероприятия</a></li>
                         <li class="nav-item"><a class="nav-link" href="/student/portfolio">Портфолио</a></li>
-                        <li class="nav-item"><a class="nav-link" href="/student/leave" id="nav-leave">Заявления</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/student/leave">Заявления</a></li>
                         <li class="nav-item"><a class="nav-link" href="/student/profile">Профиль</a></li>
+
                     <?php elseif ($role === 'parent'): ?>
-                        <!-- навигация для родителя (уже есть) -->
+                        <li class="nav-item"><a class="nav-link" href="/parent/dashboard">Дашборд</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/parent/children">Дети</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/parent/documents">Документы</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/parent/events">Мероприятия</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/parent/consents">Согласия</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/parent/leave">Заявления на выход</a></li>
+
+                    <?php elseif ($role === 'teacher'): ?>
+                        <li class="nav-item"><a class="nav-link" href="/teacher/dashboard">Дашборд</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/teacher/confirm">Подтверждение учеников</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/teacher/seating">Рассадка столовой</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/teacher/attendance">Отметки питания</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/teacher/portfolio">Портфолио класса</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/teacher/events">Мероприятия</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/teacher/leave">Заявления на выход</a></li>
+
+                    <?php elseif ($role === 'moderator'): ?>
+                        <li class="nav-item"><a class="nav-link" href="/moderator/dashboard">Дашборд</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/moderator/achievements">Достижения</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/moderator/documents">Документы</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/moderator/events">Мероприятия</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/moderator/registrations">Заявки на мероприятия</a></li>
+
+                    <?php elseif ($role === 'admin'): ?>
+                        <li class="nav-item"><a class="nav-link" href="/admin/dashboard">Дашборд</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/admin/users">Пользователи</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/admin/classes">Классы</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/admin/tags">Теги</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/admin/templates">Шаблоны</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/admin/categories">Категории</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/admin/reports">Отчёты</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/admin/rating">Рейтинг</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/admin/permissions">Права</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/admin/audit">Аудит</a></li>
                     <?php endif; ?>
                 </ul>
                 <ul class="navbar-nav">
