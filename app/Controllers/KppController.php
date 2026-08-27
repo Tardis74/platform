@@ -22,7 +22,7 @@ class KppController extends BaseController
             return ApiResponse::error('Token required.', 401);
         }
         try {
-            $this->requireRole($token, ['admin', 'moderator', 'teacher', 'kpp']);
+            $this->checkAccess($token, ['admin', 'moderator', 'teacher', 'kpp', 'kpp.view']);
         } catch (RuntimeException $e) {
             return ApiResponse::error($e->getMessage(), 403);
         }
@@ -50,7 +50,7 @@ class KppController extends BaseController
             return ApiResponse::error('Token required.', 401);
         }
         try {
-            $this->requireRole($token, ['admin', 'moderator', 'teacher', 'kpp']);
+            $this->checkAccess($token, ['admin', 'moderator', 'teacher', 'kpp', 'kpp.scan']);
         } catch (RuntimeException $e) {
             return ApiResponse::error($e->getMessage(), 403);
         }
@@ -104,7 +104,7 @@ class KppController extends BaseController
             return ApiResponse::error('Token required.', 401);
         }
         try {
-            $this->requireRole($token, ['admin', 'moderator', 'teacher', 'kpp']);
+            $this->checkAccess($token, ['admin', 'moderator', 'teacher', 'kpp', 'kpp.scan']);
         } catch (RuntimeException $e) {
             return ApiResponse::error($e->getMessage(), 403);
         }
@@ -150,7 +150,7 @@ class KppController extends BaseController
             return ApiResponse::error('Token required.', 401);
         }
         try {
-            $this->requireRole($token, ['admin', 'moderator', 'teacher', 'kpp']);
+            $this->checkAccess($token, ['admin', 'moderator', 'teacher', 'kpp', 'kpp.scan']);
         } catch (RuntimeException $e) {
             return ApiResponse::error($e->getMessage(), 403);
         }
@@ -197,7 +197,7 @@ class KppController extends BaseController
             return ApiResponse::error('Token required.', 401);
         }
         try {
-            $this->requireRole($token, ['admin', 'moderator', 'teacher', 'kpp']);
+            $this->checkAccess($token, ['admin', 'moderator', 'teacher', 'kpp', 'kpp.scan']);
         } catch (RuntimeException $e) {
             return ApiResponse::error($e->getMessage(), 403);
         }

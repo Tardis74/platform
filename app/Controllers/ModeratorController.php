@@ -21,7 +21,7 @@ class ModeratorController extends BaseController
         }
 
         try {
-            $this->requireRole($token, ['moderator', 'admin']);
+            $this->checkAccess($token, ['moderator', 'admin', 'achievements.moderate']);
         } catch (RuntimeException $e) {
             return ApiResponse::error($e->getMessage(), 403);
         }
@@ -45,7 +45,7 @@ class ModeratorController extends BaseController
         }
 
         try {
-            $this->requireRole($token, ['moderator', 'admin']);
+            $this->checkAccess($token, ['moderator', 'admin', 'achievements.moderate']);
         } catch (RuntimeException $e) {
             return ApiResponse::error($e->getMessage(), 403);
         }
@@ -101,7 +101,7 @@ class ModeratorController extends BaseController
         }
 
         try {
-            $this->requireRole($token, ['moderator', 'admin']);
+            $this->checkAccess($token, ['moderator', 'admin', 'achievements.moderate']);
         } catch (RuntimeException $e) {
             return ApiResponse::error($e->getMessage(), 403);
         }
@@ -149,7 +149,7 @@ class ModeratorController extends BaseController
         }
 
         try {
-            $this->requireRole($token, ['admin', 'moderator', 'teacher']);
+            $this->checkAccess($token, ['admin', 'moderator', 'teacher', 'events.moderate']);
         } catch (RuntimeException $e) {
             return ApiResponse::error($e->getMessage(), 403);
         }
@@ -190,7 +190,7 @@ class ModeratorController extends BaseController
         }
 
         try {
-            $this->requireRole($token, ['admin', 'moderator', 'teacher']);
+            $this->checkAccess($token, ['admin', 'moderator', 'teacher', 'events.moderate']);
         } catch (RuntimeException $e) {
             return ApiResponse::error($e->getMessage(), 403);
         }
@@ -252,7 +252,7 @@ class ModeratorController extends BaseController
         }
 
         try {
-            $this->requireRole($token, ['admin', 'moderator', 'teacher']);
+            $this->checkAccess($token, ['admin', 'moderator', 'teacher', 'events.moderate']);
         } catch (RuntimeException $e) {
             return ApiResponse::error($e->getMessage(), 403);
         }
@@ -313,7 +313,7 @@ class ModeratorController extends BaseController
     {
         $token = $this->extractTokenFromHeader();
         if (!$token) return ApiResponse::error('Token required.', 401);
-        try { $this->requireRole($token, ['admin', 'moderator', 'teacher']); } catch (\RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
+        try { $this->checkAccess($token, ['admin', 'moderator', 'teacher', 'documents.moderate']); } catch (\RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
 
         $user = $this->getCurrentUser($token);
         $classId = null;
@@ -334,7 +334,7 @@ class ModeratorController extends BaseController
     {
         $token = $this->extractTokenFromHeader();
         if (!$token) return ApiResponse::error('Token required.', 401);
-        try { $this->requireRole($token, ['admin', 'moderator', 'teacher']); } catch (\RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
+        try { $this->checkAccess($token, ['admin', 'moderator', 'teacher', 'documents.moderate']); } catch (\RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
 
         $user = $this->getCurrentUser($token);
         $documentId = (int)($payload['document_id'] ?? 0);
@@ -373,7 +373,7 @@ class ModeratorController extends BaseController
     {
         $token = $this->extractTokenFromHeader();
         if (!$token) return ApiResponse::error('Token required.', 401);
-        try { $this->requireRole($token, ['admin', 'moderator', 'teacher']); } catch (\RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
+        try { $this->checkAccess($token, ['admin', 'moderator', 'teacher', 'documents.moderate']); } catch (\RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
 
         $user = $this->getCurrentUser($token);
         $documentId = (int)($payload['document_id'] ?? 0);
@@ -421,7 +421,7 @@ class ModeratorController extends BaseController
         }
 
         try {
-            $this->requireRole($token, ['moderator', 'admin']);
+            $this->checkAccess($token, ['moderator', 'admin', 'dashboard.view']);
         } catch (RuntimeException $e) {
             return ApiResponse::error($e->getMessage(), 403);
         }

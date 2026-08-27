@@ -83,3 +83,46 @@
         </div>
     </div></div>
 </div>
+
+<!-- Модалка редактирования класса -->
+<div class="modal fade" id="editClassModal" tabindex="-1">
+    <div class="modal-dialog"><div class="modal-content">
+        <div class="modal-header"><h5>Редактировать класс</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+            <form id="editClassForm">
+                <input type="hidden" name="id">
+                <div class="mb-3"><label>Название</label><input type="text" class="form-control" name="name" required></div>
+                <div class="mb-3"><label>Учебный год</label>
+                    <select class="form-select" name="academic_year_id" required></select>
+                </div>
+                <div class="mb-3"><label>Классный руководитель</label>
+                    <select class="form-select" name="teacher_id"></select>
+                </div>
+                <button type="submit" class="btn btn-primary">Сохранить</button>
+            </form>
+        </div>
+    </div></div>
+</div>
+
+<!-- Модалка редактирования учебного года -->
+<div class="modal fade" id="editYearModal" tabindex="-1">
+    <div class="modal-dialog"><div class="modal-content">
+        <div class="modal-header"><h5>Редактировать учебный год</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+            <form id="editYearForm">
+                <input type="hidden" name="id">
+                <div class="mb-3"><label>Название</label><input type="text" class="form-control" name="name" required></div>
+                <div class="mb-3"><label>Дата начала</label><input type="date" class="form-control" name="start_date" required></div>
+                <div class="mb-3"><label>Дата окончания</label><input type="date" class="form-control" name="end_date" required></div>
+                <div class="mb-3 form-check">
+                    <input type="checkbox" class="form-check-input" name="is_current" value="1" id="editYearCurrent">
+                    <label class="form-check-label" for="editYearCurrent">Текущий год</label>
+                </div>
+                <button type="submit" class="btn btn-primary">Сохранить</button>
+            </form>
+        </div>
+    </div></div>
+</div>
+
+<script src="/assets/js/app.js"></script>
+<script src="/assets/js/admin-classes.js"></script>

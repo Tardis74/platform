@@ -1,3 +1,13 @@
+<?php
+// Определяем необходимое разрешение для данной страницы
+$requiredPermission = 'achievements.view'; // заменить на конкретное разрешение
+
+// Проверяем, если роль custom и нет нужного разрешения – запрещаем доступ
+if ($_SESSION['role'] === 'custom' && !in_array($requiredPermission, $_SESSION['permissions'] ?? [])) {
+    echo '<div class="alert alert-danger">Доступ запрещён. <a href="/custom/dashboard">На главную</a></div>';
+    return; // прекращаем выполнение шаблона
+}
+?>
 <h1>Проверка достижений</h1>
 
 <div class="row mb-3">

@@ -1,8 +1,12 @@
 // assets/js/admin-templates.js
+console.log('admin-templates.js loaded');
+
 async function loadTemplates() {
+    showLoading(true);
     try {
-        const templates = await apiCall('admin.template.list');
+        const templates = await apiCall('admin.templateList');
         const tbody = document.getElementById('templates-tbody');
+        if (!tbody) return;
         tbody.innerHTML = templates.map(t => `
             <tr>
                 <td>${t.name}</td>
@@ -16,26 +20,36 @@ async function loadTemplates() {
                 </td>
             </tr>
         `).join('');
-    } catch (e) { showToast(e.message, 'danger'); }
+    } catch (e) {
+        showToast(e.message, 'danger');
+    } finally {
+        showLoading(false);
+    }
 }
 
-function initPage() {
+document.addEventListener('DOMContentLoaded', function() {
     loadTemplates();
+
     // Создание/редактирование
-    document.getElementById('templateForm').addEventListener('submit', async function(e) {
+    document.getElementById('templateForm')?.addEventListener('submit', async function(e) {
         e.preventDefault();
         const data = Object.fromEntries(new FormData(this));
         data.requires_file = data.requires_file ? 1 : 0;
-        const method = data.id ? 'admin.template.update' : 'admin.template.create';
+        const method = data.id ? 'admin.templateUpdate' : 'admin.templateCreate';
         try {
             await apiCall(method, data);
             showToast('Шаблон сохранён', 'success');
-            bootstrap.Modal.getInstance(document.getElementById('templateModal')).hide();
+            bootstrap.Modal.getInstance(document.getElementById('templateModal'))?.hide();
             loadTemplates();
-        } catch (err) { showToast(err.message, 'danger'); }
+        } catch (err) {
+            showToast(err.message, 'danger');
+        }
     });
-    document.getElementById('previewTemplate').addEventListener('click', function() {
-        const content = document.querySelector('textarea[name="content"]').value;
+
+    // Предпросмотр содержимого
+    document.getElementById('previewTemplate')?.addEventListener('click', function() {
+        const content = document.querySelector('textarea[name="content"]')?.value;
+        if (!content) { showToast('Содержимое шаблона пусто', 'warning'); return; }
         const testData = {
             STUDENT_FIO: 'Иванов Иван Иванович',
             PARENT_FIO: 'Иванова Мария Петровна',
@@ -48,15 +62,20 @@ function initPage() {
         for (let [key, val] of Object.entries(testData)) {
             html = html.replace(new RegExp(`\\{${key}\\}`, 'g'), val);
         }
-        document.getElementById('templatePreview').innerHTML = html;
-        document.getElementById('templatePreview').style.display = 'block';
+        const preview = document.getElementById('templatePreview');
+        if (preview) {
+            preview.innerHTML = html;
+            preview.style.display = 'block';
+        }
     });
-    // Редактирование
+
+    // Редактирование - загрузка данных
     document.addEventListener('click', function(e) {
         if (e.target.classList.contains('edit-template')) {
             const id = e.target.dataset.id;
-            apiCall('admin.template.get', { id }).then(t => {
+            apiCall('admin.templateGet', { id }).then(t => {
                 const form = document.getElementById('templateForm');
+                if (!form) return;
                 form.elements['id'].value = t.id;
                 form.elements['name'].value = t.name;
                 form.elements['description'].value = t.description || '';
@@ -68,23 +87,25 @@ function initPage() {
             }).catch(err => showToast(err.message, 'danger'));
         }
     });
+
     // Удаление
     document.addEventListener('click', function(e) {
         if (e.target.classList.contains('delete-template')) {
             const id = e.target.dataset.id;
             if (confirm('Удалить шаблон?')) {
-                apiCall('admin.template.delete', { id }).then(() => {
+                apiCall('admin.templateDelete', { id }).then(() => {
                     showToast('Шаблон удалён', 'success');
                     loadTemplates();
                 }).catch(err => showToast(err.message, 'danger'));
             }
         }
     });
-    // Предпросмотр
+
+    // Предпросмотр из кнопки в таблице
     document.addEventListener('click', function(e) {
         if (e.target.classList.contains('preview-template')) {
             const id = e.target.dataset.id;
-            apiCall('admin.template.get', { id }).then(t => {
+            apiCall('admin.templateGet', { id }).then(t => {
                 const testData = {
                     STUDENT_FIO: 'Иванов Иван Иванович',
                     PARENT_FIO: 'Иванова Мария Петровна',
@@ -97,8 +118,8 @@ function initPage() {
                 for (let [key, val] of Object.entries(testData)) {
                     html = html.replace(new RegExp(`\\{${key}\\}`, 'g'), val);
                 }
-                alert(html); // упрощённо, можно в модалке
+                alert(html); // или можно открыть в модалке
             }).catch(err => showToast(err.message, 'danger'));
         }
     });
-}
+});

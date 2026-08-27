@@ -111,3 +111,5 @@
         </div>
     </div></div>
 </div>
+
+<script src="/assets/js/admin-users.js"></script>

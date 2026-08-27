@@ -1,3 +1,13 @@
+<?php
+// Определяем необходимое разрешение для данной страницы
+$requiredPermission = 'events.view'; // заменить на конкретное разрешение
+
+// Проверяем, если роль custom и нет нужного разрешения – запрещаем доступ
+if ($_SESSION['role'] === 'custom' && !in_array($requiredPermission, $_SESSION['permissions'] ?? [])) {
+    echo '<div class="alert alert-danger">Доступ запрещён. <a href="/custom/dashboard">На главную</a></div>';
+    return; // прекращаем выполнение шаблона
+}
+?>
 <h1>Управление мероприятиями</h1>
 
 <div class="mb-3">

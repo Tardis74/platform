@@ -1,4 +1,14 @@
 <?php
+// Определяем необходимое разрешение для данной страницы
+$requiredPermission = 'leave.view'; // заменить на конкретное разрешение
+
+// Проверяем, если роль custom и нет нужного разрешения – запрещаем доступ
+if ($_SESSION['role'] === 'custom' && !in_array($requiredPermission, $_SESSION['permissions'] ?? [])) {
+    echo '<div class="alert alert-danger">Доступ запрещён. <a href="/custom/dashboard">На главную</a></div>';
+    return; // прекращаем выполнение шаблона
+}
+?>
+<?php
 $pageTitle = 'Заявления на выход';
 $pageScript = '/assets/js/teacher-leave.js';
 ?>

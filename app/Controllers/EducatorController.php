@@ -21,7 +21,7 @@ class EducatorController extends BaseController
             return ApiResponse::error('Token required.', 401);
         }
         try {
-            $this->requireRole($token, ['admin', 'moderator', 'teacher']);
+            $this->checkAccess($token, ['admin', 'moderator', 'teacher', 'leave.view']);
         } catch (RuntimeException $e) {
             return ApiResponse::error($e->getMessage(), 403);
         }
@@ -48,7 +48,7 @@ class EducatorController extends BaseController
             return ApiResponse::error('Token required.', 401);
         }
         try {
-            $this->requireRole($token, ['admin', 'moderator', 'teacher']);
+            $this->checkAccess($token, ['admin', 'moderator', 'teacher','leave.approve']);
         } catch (RuntimeException $e) {
             return ApiResponse::error($e->getMessage(), 403);
         }
@@ -115,7 +115,7 @@ class EducatorController extends BaseController
             return ApiResponse::error('Token required.', 401);
         }
         try {
-            $this->requireRole($token, ['admin', 'moderator', 'teacher']);
+            $this->checkAccess($token, ['admin', 'moderator', 'teacher', 'leave.approve']);
         } catch (RuntimeException $e) {
             return ApiResponse::error($e->getMessage(), 403);
         }
@@ -163,7 +163,7 @@ class EducatorController extends BaseController
             return ApiResponse::error('Token required.', 401);
         }
         try {
-            $this->requireRole($token, ['admin', 'moderator', 'teacher']);
+            $this->checkAccess($token, ['admin', 'moderator', 'teacher', 'leave.approve']);
         } catch (RuntimeException $e) {
             return ApiResponse::error($e->getMessage(), 403);
         }

@@ -22,7 +22,7 @@ class EventController extends BaseController
         }
 
         try {
-            $this->requireRole($token, ['admin', 'moderator', 'teacher']);
+            $this->checkAccess($token, ['admin', 'moderator', 'teacher', 'events.create']);
         } catch (RuntimeException $e) {
             return ApiResponse::error($e->getMessage(), 403);
         }

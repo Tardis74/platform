@@ -17,7 +17,7 @@ class CanteenController extends BaseController
     {
         $token = $this->extractTokenFromHeader();
         if (!$token) return ApiResponse::error('Token required.', 401);
-        try { $this->requireRole($token, ['canteen', 'admin']); } catch (RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
+        try { $this->checkAccess($token, ['canteen', 'admin', 'canteen.view']); } catch (RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
 
         $date = $payload['date'] ?? date('Y-m-d');
         if (!strtotime($date)) {
@@ -35,7 +35,7 @@ class CanteenController extends BaseController
     {
         $token = $this->extractTokenFromHeader();
         if (!$token) return ApiResponse::error('Token required.', 401);
-        try { $this->requireRole($token, ['canteen', 'admin']); } catch (RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
+        try { $this->checkAccess($token, ['canteen', 'admin', 'canteen.view']); } catch (RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
 
         $date = $payload['date'] ?? date('Y-m-d');
         $format = $payload['format'] ?? 'csv';
@@ -82,7 +82,7 @@ class CanteenController extends BaseController
     {
         $token = $this->extractTokenFromHeader();
         if (!$token) return ApiResponse::error('Token required.', 401);
-        try { $this->requireRole($token, ['canteen', 'admin']); } catch (RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
+        try { $this->checkAccess($token, ['canteen', 'admin', 'canteen.view']); } catch (RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
 
         $date = $payload['date'] ?? date('Y-m-d');
         if (!strtotime($date)) {

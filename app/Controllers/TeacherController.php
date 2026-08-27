@@ -19,7 +19,7 @@ class TeacherController extends BaseController
         }
 
         try {
-            $this->requireRole($token, 'teacher');
+            $this->checkAccess($token, ['teacher', 'students.view']);
         } catch (RuntimeException $e) {
             return ApiResponse::error($e->getMessage(), 403);
         }
@@ -52,7 +52,7 @@ class TeacherController extends BaseController
         }
 
         try {
-            $this->requireRole($token, 'teacher');
+            $this->checkAccess($token, ['teacher', 'students.edit']);
         } catch (RuntimeException $e) {
             return ApiResponse::error($e->getMessage(), 403);
         }
@@ -121,7 +121,7 @@ class TeacherController extends BaseController
         }
 
         try {
-            $this->requireRole($token, 'teacher');
+            $this->checkAccess($token, ['teacher', checkAccess]);
         } catch (RuntimeException $e) {
             return ApiResponse::error($e->getMessage(), 403);
         }
@@ -183,7 +183,7 @@ class TeacherController extends BaseController
     {
         $token = $this->extractTokenFromHeader();
         if (!$token) return ApiResponse::error('Token required.', 401);
-        try { $this->requireRole($token, ['teacher', 'admin']); } catch (\RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
+        try { $this->checkAccess($token, ['teacher', 'admin', 'canteen.view']); } catch (\RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
 
         $user = $this->getCurrentUser($token);
         $classId = isset($payload['class_id']) ? (int)$payload['class_id'] : null;
@@ -216,7 +216,7 @@ class TeacherController extends BaseController
     {
         $token = $this->extractTokenFromHeader();
         if (!$token) return ApiResponse::error('Token required.', 401);
-        try { $this->requireRole($token, ['teacher', 'admin']); } catch (\RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
+        try { $this->checkAccess($token, ['teacher', 'admin', 'canteen.edit']); } catch (\RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
 
         $user = $this->getCurrentUser($token);
         $classId = isset($payload['class_id']) ? (int)$payload['class_id'] : null;
@@ -265,7 +265,7 @@ class TeacherController extends BaseController
         // Аналогичная проверка прав, как в seatingSet
         $token = $this->extractTokenFromHeader();
         if (!$token) return ApiResponse::error('Token required.', 401);
-        try { $this->requireRole($token, ['teacher', 'admin']); } catch (\RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
+        try { $this->checkAccess($token, ['teacher', 'admin', 'canteen.edit']); } catch (\RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
 
         $user = $this->getCurrentUser($token);
         $classId = isset($payload['class_id']) ? (int)$payload['class_id'] : null;
@@ -304,7 +304,7 @@ class TeacherController extends BaseController
     {
         $token = $this->extractTokenFromHeader();
         if (!$token) return ApiResponse::error('Token required.', 401);
-        try { $this->requireRole($token, ['teacher', 'admin']); } catch (\RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
+        try { $this->checkAccess($token, ['teacher', 'admin', 'canteen.edit']); } catch (\RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
 
         $user = $this->getCurrentUser($token);
         $date = $payload['date'] ?? date('Y-m-d');
@@ -354,7 +354,7 @@ class TeacherController extends BaseController
     {
         $token = $this->extractTokenFromHeader();
         if (!$token) return ApiResponse::error('Token required.', 401);
-        try { $this->requireRole($token, ['teacher', 'admin']); } catch (\RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
+        try { $this->checkAccess($token, ['teacher', 'admin', 'canteen.view']); } catch (\RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
 
         $user = $this->getCurrentUser($token);
         $classId = isset($payload['class_id']) ? (int)$payload['class_id'] : null;
@@ -392,7 +392,7 @@ class TeacherController extends BaseController
     {
         $token = $this->extractTokenFromHeader();
         if (!$token) return ApiResponse::error('Token required.', 401);
-        try { $this->requireRole($token, 'teacher'); } catch (RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
+        try { $this->checkAccess($token, ['teacher', 'dashboard.view']); } catch (RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
 
         $user = $this->getCurrentUser($token);
         $teacher = $db->fetch("SELECT class_id FROM teachers WHERE user_id = :user_id", ['user_id' => $user['id']]);
@@ -445,7 +445,7 @@ class TeacherController extends BaseController
     {
         $token = $this->extractTokenFromHeader();
         if (!$token) return ApiResponse::error('Token required.', 401);
-        try { $this->requireRole($token, 'teacher'); } catch (RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
+        try { $this->checkAccess($token, ['teacher', 'students.view']); } catch (RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
 
         $user = $this->getCurrentUser($token);
         $teacher = $db->fetch("SELECT class_id FROM teachers WHERE user_id = :user_id", ['user_id' => $user['id']]);
@@ -465,7 +465,7 @@ class TeacherController extends BaseController
     {
         $token = $this->extractTokenFromHeader();
         if (!$token) return ApiResponse::error('Token required.', 401);
-        try { $this->requireRole($token, 'teacher'); } catch (RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
+        try { $this->checkAccess($token, ['teacher', 'achievements.moderate']); } catch (RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
 
         $user = $this->getCurrentUser($token);
         $teacher = $db->fetch("SELECT class_id FROM teachers WHERE user_id = :user_id", ['user_id' => $user['id']]);
@@ -499,7 +499,7 @@ class TeacherController extends BaseController
     {
         $token = $this->extractTokenFromHeader();
         if (!$token) return ApiResponse::error('Token required.', 401);
-        try { $this->requireRole($token, 'teacher'); } catch (RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
+        try { $this->checkAccess($token, ['teacher', 'leave.view']); } catch (RuntimeException $e) { return ApiResponse::error($e->getMessage(), 403); }
 
         $user = $this->getCurrentUser($token);
         $teacher = $db->fetch("SELECT class_id FROM teachers WHERE user_id = :user_id", ['user_id' => $user['id']]);

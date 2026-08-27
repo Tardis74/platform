@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Хост: 127.0.0.1
--- Время создания: Авг 26 2026 г., 20:41
+-- Время создания: Авг 27 2026 г., 18:49
 -- Версия сервера: 10.4.27-MariaDB
 -- Версия PHP: 7.4.33
 
@@ -20,6 +20,29 @@ SET time_zone = "+00:00";
 --
 -- База данных: `lyceum_db`
 --
+
+-- --------------------------------------------------------
+
+--
+-- Структура таблицы `academic_years`
+--
+
+CREATE TABLE `academic_years` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `name` varchar(100) NOT NULL COMMENT 'Название (например, 2024-2025)',
+  `start_date` date NOT NULL,
+  `end_date` date NOT NULL,
+  `is_current` tinyint(1) NOT NULL DEFAULT 0 COMMENT '1 – текущий учебный год',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Дамп данных таблицы `academic_years`
+--
+
+INSERT INTO `academic_years` (`id`, `name`, `start_date`, `end_date`, `is_current`, `created_at`, `updated_at`) VALUES
+(1, '123', '0026-09-01', '2027-08-31', 1, '2026-08-27 09:42:22', '2026-08-27 10:25:16');
 
 -- --------------------------------------------------------
 
@@ -149,9 +172,18 @@ CREATE TABLE `canteen_special_meals` (
 CREATE TABLE `classes` (
   `id` int(10) UNSIGNED NOT NULL,
   `name` varchar(50) NOT NULL,
+  `academic_year_id` int(10) UNSIGNED DEFAULT NULL,
   `year` year(4) NOT NULL,
-  `teacher_id` int(10) UNSIGNED DEFAULT NULL
+  `teacher_id` int(10) UNSIGNED DEFAULT NULL,
+  `is_archived` tinyint(1) NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Дамп данных таблицы `classes`
+--
+
+INSERT INTO `classes` (`id`, `name`, `academic_year_id`, `year`, `teacher_id`, `is_archived`) VALUES
+(2, '8Б', 1, 0000, NULL, 0);
 
 -- --------------------------------------------------------
 
@@ -247,6 +279,13 @@ CREATE TABLE `event_categories` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Дамп данных таблицы `event_categories`
+--
+
+INSERT INTO `event_categories` (`id`, `name`, `created_at`) VALUES
+(2, '123', '2026-08-27 10:01:43');
+
 -- --------------------------------------------------------
 
 --
@@ -296,6 +335,13 @@ CREATE TABLE `event_tags` (
   `name` varchar(50) NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Дамп данных таблицы `event_tags`
+--
+
+INSERT INTO `event_tags` (`id`, `name`, `created_at`) VALUES
+(1, '213', '2026-08-27 09:43:04');
 
 -- --------------------------------------------------------
 
@@ -407,6 +453,69 @@ CREATE TABLE `parent_student` (
 -- --------------------------------------------------------
 
 --
+-- Структура таблицы `permissions`
+--
+
+CREATE TABLE `permissions` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `name` varchar(100) NOT NULL,
+  `group_name` varchar(50) NOT NULL,
+  `label` varchar(255) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Дамп данных таблицы `permissions`
+--
+
+INSERT INTO `permissions` (`id`, `name`, `group_name`, `label`) VALUES
+(1, 'users.view', 'Пользователи', 'users.view'),
+(2, 'users.create', 'Пользователи', 'users.create'),
+(3, 'users.edit', 'Пользователи', 'users.edit'),
+(4, 'users.delete', 'Пользователи', 'users.delete'),
+(5, 'users.block', 'Пользователи', 'users.block'),
+(6, 'classes.view', 'Классы', 'classes.view'),
+(7, 'classes.create', 'Классы', 'classes.create'),
+(8, 'classes.edit', 'Классы', 'classes.edit'),
+(9, 'classes.archive', 'Классы', 'classes.archive'),
+(10, 'tags.view', 'Теги', 'tags.view'),
+(11, 'tags.create', 'Теги', 'tags.create'),
+(12, 'tags.edit', 'Теги', 'tags.edit'),
+(13, 'tags.delete', 'Теги', 'tags.delete'),
+(14, 'templates.view', 'Шаблоны', 'templates.view'),
+(15, 'templates.create', 'Шаблоны', 'templates.create'),
+(16, 'templates.edit', 'Шаблоны', 'templates.edit'),
+(17, 'templates.delete', 'Шаблоны', 'templates.delete'),
+(18, 'categories.view', 'Категории', 'categories.view'),
+(19, 'categories.create', 'Категории', 'categories.create'),
+(20, 'categories.edit', 'Категории', 'categories.edit'),
+(21, 'categories.delete', 'Категории', 'categories.delete'),
+(22, 'reports.view', 'Отчёты', 'reports.view'),
+(23, 'reports.generate', 'Отчёты', 'reports.generate'),
+(24, 'rating.view', 'Рейтинг', 'rating.view'),
+(25, 'rating.build', 'Рейтинг', 'rating.build'),
+(26, 'rating.publish', 'Рейтинг', 'rating.publish'),
+(27, 'permissions.view', 'Права доступа', 'permissions.view'),
+(28, 'permissions.edit', 'Права доступа', 'permissions.edit'),
+(29, 'audit.view', 'Аудит', 'audit.view'),
+(30, 'events.view', 'Мероприятия', 'events.view'),
+(31, 'events.create', 'Мероприятия', 'events.create'),
+(32, 'events.edit', 'Мероприятия', 'events.edit'),
+(33, 'events.delete', 'Мероприятия', 'events.delete'),
+(34, 'documents.view', 'Документы', 'documents.view'),
+(35, 'documents.moderate', 'Документы', 'documents.moderate'),
+(36, 'achievements.view', 'Достижения', 'achievements.view'),
+(37, 'achievements.moderate', 'Достижения', 'achievements.moderate'),
+(38, 'leave.view', 'Заявления на выход', 'leave.view'),
+(39, 'leave.approve', 'Заявления на выход', 'leave.approve'),
+(40, 'canteen.view', 'Питание', 'canteen.view'),
+(41, 'canteen.edit', 'Питание', 'canteen.edit'),
+(42, 'kpp.view', 'КПП', 'kpp.view'),
+(43, 'kpp.scan', 'КПП', 'kpp.scan'),
+(44, 'dashboard.view', 'Дашборд', 'dashboard.view');
+
+-- --------------------------------------------------------
+
+--
 -- Структура таблицы `queue`
 --
 
@@ -436,10 +545,69 @@ CREATE TABLE `rate_limits` (
 --
 
 INSERT INTO `rate_limits` (`ip`, `window_start`, `count`) VALUES
-('127.0.0.1', 1787695626, 8),
-('127.0.0.1', 1787695632, 2),
-('127.0.0.1', 1787695657, 2),
-('127.0.0.1', 1787695662, 6);
+('127.0.0.1', 1787839134, 2),
+('127.0.0.1', 1787839147, 3),
+('127.0.0.1', 1787839157, 3),
+('127.0.0.1', 1787839167, 3),
+('127.0.0.1', 1787839168, 1),
+('127.0.0.1', 1787839172, 1),
+('127.0.0.1', 1787839173, 1),
+('127.0.0.1', 1787839178, 2),
+('127.0.0.1', 1787839190, 2);
+
+-- --------------------------------------------------------
+
+--
+-- Структура таблицы `ratings`
+--
+
+CREATE TABLE `ratings` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `period` varchar(7) NOT NULL COMMENT 'Месяц в формате YYYY-MM',
+  `class_ids` text DEFAULT NULL COMMENT 'JSON-массив ID классов',
+  `category_ids` text DEFAULT NULL COMMENT 'JSON-массив ID категорий достижений',
+  `published` tinyint(1) NOT NULL DEFAULT 0 COMMENT '1 – опубликован',
+  `data` longtext NOT NULL COMMENT 'JSON с данными рейтинга (место, идентификатор, баллы, комментарий)',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Структура таблицы `report_jobs`
+--
+
+CREATE TABLE `report_jobs` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `type` varchar(50) NOT NULL COMMENT 'Тип отчёта (events, city, portfolio и т.д.)',
+  `params` longtext NOT NULL COMMENT 'Параметры в JSON',
+  `status` enum('pending','processing','ready','error') NOT NULL DEFAULT 'pending',
+  `file_path` varchar(255) DEFAULT NULL COMMENT 'Путь к сгенерированному файлу',
+  `error_message` text DEFAULT NULL,
+  `created_by` int(10) UNSIGNED DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Структура таблицы `settings`
+--
+
+CREATE TABLE `settings` (
+  `key` varchar(100) NOT NULL,
+  `value` text DEFAULT NULL,
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Дамп данных таблицы `settings`
+--
+
+INSERT INTO `settings` (`key`, `value`, `updated_at`) VALUES
+('rating_show_place', '1', '2026-08-27 08:56:04');
 
 -- --------------------------------------------------------
 
@@ -482,24 +650,42 @@ CREATE TABLE `users` (
   `id` int(10) UNSIGNED NOT NULL,
   `email` varchar(255) NOT NULL,
   `password_hash` varchar(255) NOT NULL,
-  `role` enum('admin','teacher','parent','student','canteen') NOT NULL,
+  `role` enum('admin','teacher','parent','student','canteen','moderator','educator','kpp','custom') NOT NULL,
   `full_name` varchar(255) NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NULL DEFAULT NULL ON UPDATE current_timestamp(),
-  `first_login` tinyint(1) NOT NULL DEFAULT 1
+  `first_login` tinyint(1) NOT NULL DEFAULT 1,
+  `deleted_at` timestamp NULL DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Дамп данных таблицы `users`
 --
 
-INSERT INTO `users` (`id`, `email`, `password_hash`, `role`, `full_name`, `created_at`, `updated_at`, `first_login`) VALUES
-(1, 'admin@example.com', '$2y$10$lQxdksaPab0v5LqkWfrRk.Fu1rl70qoRrrwyir7I0/ytwJREP3K5C', 'admin', 'Admin User', '2026-08-24 22:34:14', NULL, 1),
-(5, 'svelegzanin3@yandex.ru', '$2y$10$vu2D2Fx.DVywyXOu9LKfReNnIYTi57gtRW8fAowZKWfz7lqYMUZBC', 'parent', 'Велегжанин Сергей Олегович', '2026-08-25 21:18:25', NULL, 1);
+INSERT INTO `users` (`id`, `email`, `password_hash`, `role`, `full_name`, `created_at`, `updated_at`, `first_login`, `deleted_at`) VALUES
+(1, 'admin@example.com', '$2y$10$lQxdksaPab0v5LqkWfrRk.Fu1rl70qoRrrwyir7I0/ytwJREP3K5C', 'admin', 'Admin User', '2026-08-24 22:34:14', NULL, 1, NULL),
+(5, 'svelegzanin3@yandex.ru', '$2y$10$vu2D2Fx.DVywyXOu9LKfReNnIYTi57gtRW8fAowZKWfz7lqYMUZBC', 'parent', 'Велегжанин Сергей Олегович', '2026-08-25 21:18:25', NULL, 1, NULL);
+
+-- --------------------------------------------------------
+
+--
+-- Структура таблицы `user_permissions`
+--
+
+CREATE TABLE `user_permissions` (
+  `user_id` int(10) UNSIGNED NOT NULL,
+  `permission` varchar(100) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Индексы сохранённых таблиц
 --
+
+--
+-- Индексы таблицы `academic_years`
+--
+ALTER TABLE `academic_years`
+  ADD PRIMARY KEY (`id`);
 
 --
 -- Индексы таблицы `achievements`
@@ -556,7 +742,8 @@ ALTER TABLE `canteen_special_meals`
 --
 ALTER TABLE `classes`
   ADD PRIMARY KEY (`id`),
-  ADD KEY `idx_teacher_id` (`teacher_id`);
+  ADD KEY `idx_teacher_id` (`teacher_id`),
+  ADD KEY `fk_classes_academic_year` (`academic_year_id`);
 
 --
 -- Индексы таблицы `consents`
@@ -680,6 +867,13 @@ ALTER TABLE `parent_student`
   ADD KEY `idx_student_id` (`student_id`);
 
 --
+-- Индексы таблицы `permissions`
+--
+ALTER TABLE `permissions`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `name` (`name`);
+
+--
 -- Индексы таблицы `queue`
 --
 ALTER TABLE `queue`
@@ -694,6 +888,28 @@ ALTER TABLE `rate_limits`
   ADD KEY `idx_window_start` (`window_start`);
 
 --
+-- Индексы таблицы `ratings`
+--
+ALTER TABLE `ratings`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `period` (`period`),
+  ADD KEY `published` (`published`);
+
+--
+-- Индексы таблицы `report_jobs`
+--
+ALTER TABLE `report_jobs`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `status` (`status`),
+  ADD KEY `created_by` (`created_by`);
+
+--
+-- Индексы таблицы `settings`
+--
+ALTER TABLE `settings`
+  ADD PRIMARY KEY (`key`);
+
+--
 -- Индексы таблицы `students`
 --
 ALTER TABLE `students`
@@ -701,7 +917,9 @@ ALTER TABLE `students`
   ADD UNIQUE KEY `snils_hash` (`snils_hash`),
   ADD UNIQUE KEY `uk_user_id` (`user_id`),
   ADD KEY `idx_snils_hash` (`snils_hash`),
-  ADD KEY `idx_class_id` (`class_id`);
+  ADD KEY `idx_class_id` (`class_id`),
+  ADD KEY `idx_class_id_status` (`class_id`,`status`),
+  ADD KEY `idx_status` (`status`);
 
 --
 -- Индексы таблицы `teachers`
@@ -716,11 +934,24 @@ ALTER TABLE `teachers`
 ALTER TABLE `users`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `email` (`email`),
-  ADD KEY `idx_email` (`email`);
+  ADD KEY `idx_email` (`email`),
+  ADD KEY `idx_deleted_at` (`deleted_at`);
+
+--
+-- Индексы таблицы `user_permissions`
+--
+ALTER TABLE `user_permissions`
+  ADD PRIMARY KEY (`user_id`,`permission`);
 
 --
 -- AUTO_INCREMENT для сохранённых таблиц
 --
+
+--
+-- AUTO_INCREMENT для таблицы `academic_years`
+--
+ALTER TABLE `academic_years`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT для таблицы `achievements`
@@ -762,7 +993,7 @@ ALTER TABLE `canteen_special_meals`
 -- AUTO_INCREMENT для таблицы `classes`
 --
 ALTER TABLE `classes`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT для таблицы `consents`
@@ -792,7 +1023,7 @@ ALTER TABLE `events`
 -- AUTO_INCREMENT для таблицы `event_categories`
 --
 ALTER TABLE `event_categories`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT для таблицы `event_registrations`
@@ -804,7 +1035,7 @@ ALTER TABLE `event_registrations`
 -- AUTO_INCREMENT для таблицы `event_tags`
 --
 ALTER TABLE `event_tags`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT для таблицы `kpp_logs`
@@ -831,9 +1062,27 @@ ALTER TABLE `parents`
   MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
+-- AUTO_INCREMENT для таблицы `permissions`
+--
+ALTER TABLE `permissions`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=45;
+
+--
 -- AUTO_INCREMENT для таблицы `queue`
 --
 ALTER TABLE `queue`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT для таблицы `ratings`
+--
+ALTER TABLE `ratings`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT для таблицы `report_jobs`
+--
+ALTER TABLE `report_jobs`
   MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
@@ -852,7 +1101,7 @@ ALTER TABLE `teachers`
 -- AUTO_INCREMENT для таблицы `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
 -- Ограничения внешнего ключа сохраненных таблиц
@@ -891,6 +1140,7 @@ ALTER TABLE `canteen_special_meals`
 -- Ограничения внешнего ключа таблицы `classes`
 --
 ALTER TABLE `classes`
+  ADD CONSTRAINT `fk_classes_academic_year` FOREIGN KEY (`academic_year_id`) REFERENCES `academic_years` (`id`) ON DELETE SET NULL,
   ADD CONSTRAINT `fk_classes_teacher_id` FOREIGN KEY (`teacher_id`) REFERENCES `teachers` (`id`) ON DELETE SET NULL;
 
 --
@@ -972,6 +1222,12 @@ ALTER TABLE `parent_student`
   ADD CONSTRAINT `fk_parent_student_student_id` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE;
 
 --
+-- Ограничения внешнего ключа таблицы `report_jobs`
+--
+ALTER TABLE `report_jobs`
+  ADD CONSTRAINT `fk_report_jobs_user` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL;
+
+--
 -- Ограничения внешнего ключа таблицы `students`
 --
 ALTER TABLE `students`
@@ -983,6 +1239,12 @@ ALTER TABLE `students`
 --
 ALTER TABLE `teachers`
   ADD CONSTRAINT `fk_teachers_user_id` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+
+--
+-- Ограничения внешнего ключа таблицы `user_permissions`
+--
+ALTER TABLE `user_permissions`
+  ADD CONSTRAINT `fk_user_perm_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

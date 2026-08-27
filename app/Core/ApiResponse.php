@@ -74,4 +74,9 @@ class ApiResponse
         ], JSON_UNESCAPED_UNICODE);
         exit;
     }
+
+    public function getData()
+    {
+        return $this->data;
+    }
 }

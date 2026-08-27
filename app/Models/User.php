@@ -87,4 +87,9 @@ class User
         $stmt = $db->query($sql, ['first_login' => (int)$value, 'id' => $userId]);
         return $stmt->rowCount() > 0;
     }
+
+    public static function getPermissions(int $userId): array
+    {
+        return \App\Models\UserPermission::getPermissions($userId);
+    }
 }

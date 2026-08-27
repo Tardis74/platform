@@ -1,8 +1,12 @@
 // assets/js/admin-categories.js
+console.log('admin-categories.js loaded');
+
 async function loadCategories() {
+    showLoading(true);
     try {
-        const categories = await apiCall('admin.category.list');
+        const categories = await apiCall('admin.categoryList');
         const tbody = document.getElementById('categories-tbody');
+        if (!tbody) return;
         tbody.innerHTML = categories.map(c => `
             <tr>
                 <td>${c.name}</td>
@@ -13,28 +17,37 @@ async function loadCategories() {
                 </td>
             </tr>
         `).join('');
-    } catch (e) { showToast(e.message, 'danger'); }
+    } catch (e) {
+        showToast(e.message, 'danger');
+    } finally {
+        showLoading(false);
+    }
 }
 
-function initPage() {
+document.addEventListener('DOMContentLoaded', function() {
     loadCategories();
+
     // Создание
-    document.getElementById('createCategoryForm').addEventListener('submit', async function(e) {
+    document.getElementById('createCategoryForm')?.addEventListener('submit', async function(e) {
         e.preventDefault();
         const data = Object.fromEntries(new FormData(this));
         try {
-            await apiCall('admin.category.create', data);
+            await apiCall('admin.categoryCreate', data);
             showToast('Категория создана', 'success');
-            bootstrap.Modal.getInstance(document.getElementById('createCategoryModal')).hide();
+            bootstrap.Modal.getInstance(document.getElementById('createCategoryModal'))?.hide();
             loadCategories();
-        } catch (err) { showToast(err.message, 'danger'); }
+        } catch (err) {
+            showToast(err.message, 'danger');
+        }
     });
-    // Редактирование
+
+    // Редактирование - загрузка данных
     document.addEventListener('click', function(e) {
         if (e.target.classList.contains('edit-category')) {
             const id = e.target.dataset.id;
-            apiCall('admin.category.get', { id }).then(cat => {
+            apiCall('admin.categoryGet', { id }).then(cat => {
                 const form = document.getElementById('editCategoryForm');
+                if (!form) return;
                 form.elements['id'].value = cat.id;
                 form.elements['name'].value = cat.name;
                 form.elements['weight'].value = cat.weight;
@@ -42,26 +55,31 @@ function initPage() {
             }).catch(err => showToast(err.message, 'danger'));
         }
     });
-    document.getElementById('editCategoryForm').addEventListener('submit', async function(e) {
+
+    // Сохранение редактирования
+    document.getElementById('editCategoryForm')?.addEventListener('submit', async function(e) {
         e.preventDefault();
         const data = Object.fromEntries(new FormData(this));
         try {
-            await apiCall('admin.category.update', data);
+            await apiCall('admin.categoryUpdate', data);
             showToast('Категория обновлена', 'success');
-            bootstrap.Modal.getInstance(document.getElementById('editCategoryModal')).hide();
+            bootstrap.Modal.getInstance(document.getElementById('editCategoryModal'))?.hide();
             loadCategories();
-        } catch (err) { showToast(err.message, 'danger'); }
+        } catch (err) {
+            showToast(err.message, 'danger');
+        }
     });
+
     // Удаление
     document.addEventListener('click', function(e) {
         if (e.target.classList.contains('delete-category')) {
             const id = e.target.dataset.id;
             if (confirm('Удалить категорию?')) {
-                apiCall('admin.category.delete', { id }).then(() => {
+                apiCall('admin.categoryDelete', { id }).then(() => {
                     showToast('Категория удалена', 'success');
                     loadCategories();
                 }).catch(err => showToast(err.message, 'danger'));
             }
         }
     });
-}
+});

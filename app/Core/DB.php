@@ -124,11 +124,16 @@ class DB
     public function update(string $table, array $data, string $where, array $whereParams = []): int
     {
         $sets = [];
+        $params = [];
         foreach ($data as $field => $value) {
             $sets[] = "`$field` = :$field";
+            $params[":$field"] = $value;
         }
         $sql = "UPDATE `$table` SET " . implode(', ', $sets) . " WHERE $where";
-        $params = array_merge($data, $whereParams);
+        // Добавляем параметры WHERE (они уже должны быть с префиксом :)
+        foreach ($whereParams as $key => $value) {
+            $params[$key] = $value;
+        }
         $stmt = $this->query($sql, $params);
         return $stmt->rowCount();
     }

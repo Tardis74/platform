@@ -44,3 +44,6 @@
 </table>
 <nav><ul class="pagination" id="audit-pagination"></ul></nav>
 <p class="text-muted">Срок хранения: не менее 1 года. Архивация производится автоматически.</p>
+
+<script src="/assets/js/app.js"></script>
+<script src="/assets/js/admin-audit.js"></script>

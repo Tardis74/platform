@@ -4,6 +4,7 @@ namespace App\Controllers;
 
 use App\Core\Auth;
 use App\Models\User;
+use App\Models\UserPermission;
 use RuntimeException;
 
 /**
@@ -60,5 +61,30 @@ abstract class BaseController
             return $matches[1];
         }
         return null;
+    }
+
+    protected function checkAccess(string $token, $allowedRoles, ?string $permission = null): void
+    {
+        $data = Auth::getUserFromToken($token, true);
+        $user = $data['user'];
+        $role = $user['role'] ?? '';
+
+        if ($role === 'custom') {
+            if ($permission === null) {
+                throw new RuntimeException('Permission required for custom role.', 403);
+            }
+            if (!UserPermission::hasPermission($user['id'], $permission)) {
+                throw new RuntimeException('Access denied: missing permission.', 403);
+            }
+            return;
+        }
+
+        // Стандартная проверка роли
+        if (is_array($allowedRoles) && !in_array($role, $allowedRoles)) {
+            throw new RuntimeException('Access denied: insufficient role.', 403);
+        }
+        if (is_string($allowedRoles) && $role !== $allowedRoles) {
+            throw new RuntimeException('Access denied: insufficient role.', 403);
+        }
     }
 }

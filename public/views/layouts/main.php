@@ -22,7 +22,10 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
-                    <?php if ($role === 'student'): ?>
+                    <?php if ($role === 'custom'): ?>
+                        <!-- Меню будет построено JavaScript -->
+                        <li class="nav-item"><span class="nav-link" id="dynamic-menu-placeholder">Загрузка...</span></li>
+                    <?php elseif ($role === 'student'): ?>
                         <li class="nav-item"><a class="nav-link" href="/student/dashboard">Дашборд</a></li>
                         <li class="nav-item"><a class="nav-link" href="/student/events">Мероприятия</a></li>
                         <li class="nav-item"><a class="nav-link" href="/student/portfolio">Портфолио</a></li>
@@ -100,5 +103,51 @@
             document.getElementById('logout-btn')?.addEventListener('click', logout);
         });
     </script>
+
+    <?php if ($role === 'custom'): ?>
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                const menuContainer = document.getElementById('main-nav');
+                const permissions = window.userPermissions || [];
+                const menuItems = [];
+
+                const menuMap = [
+                    { permission: 'dashboard.view', url: '/custom/dashboard', label: 'Дашборд' },
+                    { permission: 'users.view', url: '/admin/users', label: 'Пользователи' },
+                    { permission: 'classes.view', url: '/admin/classes', label: 'Классы' },
+                    { permission: 'tags.view', url: '/admin/tags', label: 'Теги' },
+                    { permission: 'templates.view', url: '/admin/templates', label: 'Шаблоны' },
+                    { permission: 'categories.view', url: '/admin/categories', label: 'Категории' },
+                    { permission: 'reports.view', url: '/admin/reports', label: 'Отчёты' },
+                    { permission: 'rating.view', url: '/admin/rating', label: 'Рейтинг' },
+                    { permission: 'permissions.view', url: '/admin/permissions', label: 'Права' },
+                    { permission: 'audit.view', url: '/admin/audit', label: 'Аудит' },
+                    { permission: 'events.view', url: '/admin/events', label: 'Мероприятия' },
+                    { permission: 'documents.view', url: '/admin/documents', label: 'Документы' },
+                    { permission: 'achievements.view', url: '/admin/achievements', label: 'Достижения' },
+                    { permission: 'leave.view', url: '/admin/leave', label: 'Заявления' },
+                    { permission: 'canteen.view', url: '/admin/canteen', label: 'Питание' },
+                    { permission: 'kpp.view', url: '/admin/kpp', label: 'КПП' },
+                ];
+
+                menuMap.forEach(item => {
+                    if (permissions.includes(item.permission) || permissions.includes('*')) {
+                        menuItems.push(`<li class="nav-item"><a class="nav-link" href="${item.url}">${item.label}</a></li>`);
+                    }
+                });
+
+                if (menuItems.length === 0) {
+                    menuItems.push('<li class="nav-item"><span class="nav-link text-muted">Нет доступных разделов</span></li>');
+                }
+
+                const placeholder = menuContainer.querySelector('#dynamic-menu-placeholder');
+                if (placeholder) {
+                    placeholder.parentElement.outerHTML = menuItems.join('');
+                } else {
+                    menuContainer.innerHTML = menuItems.join('');
+                }
+            });
+        </script>
+    <?php endif; ?>
 </body>
 </html>

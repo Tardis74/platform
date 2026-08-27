@@ -3,7 +3,7 @@
 ?>
 <h1>Управление шаблонами документов</h1>
 <div class="mb-3">
-    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createTemplateModal">Создать шаблон</button>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#templateModal">Создать шаблон</button>
 </div>
 <table class="table table-striped" id="templates-table">
     <thead><tr><th>Название</th><th>Описание</th><th>Уровень подписи</th><th>Требует файл</th><th>Действия</th></tr></thead>
@@ -42,3 +42,6 @@
         </div>
     </div></div>
 </div>
+
+<script src="/assets/js/app.js"></script>
+<script src="/assets/js/admin-templates.js"></script>

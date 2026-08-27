@@ -87,18 +87,18 @@ function showLoading(show = true) {
         if (!overlay) {
             overlay = document.createElement('div');
             overlay.id = 'loading-overlay';
-            overlay.className = 'd-flex justify-content-center align-items-center';
+            overlay.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.7); z-index:9999; display:flex; justify-content:center; align-items:center;';
             overlay.innerHTML = `<div class="spinner-border text-primary" role="status"><span class="visually-hidden">Загрузка...</span></div>`;
             document.body.appendChild(overlay);
+        } else {
+            overlay.style.display = 'flex';
         }
-        overlay.style.display = 'flex';
     } else {
         if (overlay) {
-            overlay.style.display = 'none';
+            overlay.remove(); // Полностью удаляем элемент
         }
     }
 }
-
 /**
  * Выход из системы – удаляет токен, очищает данные пользователя, перенаправляет на логин.
  */
@@ -119,6 +119,7 @@ async function getUser() {
     try {
         const data = await apiCall('auth.check');
         window.user = data.user;
+	window.userPermissions = data.user.permissions || [];
         return window.user;
     } catch (e) {
         console.error('getUser error:', e);

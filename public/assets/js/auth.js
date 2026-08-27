@@ -29,7 +29,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (user && user.role) {
                         dashboard = '/' + user.role + '/dashboard';
                     }
-                    window.location.href = dashboard;
+                    window.location.href = data.redirect || '/' + user.role + '/dashboard';
                 } else {
                     showToast('Ошибка входа: токен не получен', 'danger');
                 }

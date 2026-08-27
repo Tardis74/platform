@@ -48,6 +48,8 @@ if (empty($method)) {
     ApiResponse::error('Method parameter is required.', 400)->send();
 }
 
+file_put_contents(__DIR__ . '/../storage/logs/debug.log', date('Y-m-d H:i:s') . " - Method: $method\n", FILE_APPEND);
+
 // Получаем данные: для GET используем $_GET, для POST/JSON - php://input
 $payload = [];
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {

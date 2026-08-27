@@ -34,6 +34,8 @@ class AuthController extends BaseController
 
         // Генерируем токен (роль возьмём из БД, предположим поле role есть)
         $token = \App\Core\Auth::generateToken($user['id'], $user['role']);
+        $role = $user['role'];
+        $redirect = ($role === 'custom') ? '/custom/dashboard' : '/' . $role . '/dashboard';
 
         return ApiResponse::success([
             'token' => $token,
@@ -67,20 +69,23 @@ class AuthController extends BaseController
      */
     public function check(DB $db, array $payload): ApiResponse
     {
-        // Токен уже проверен в middleware, получаем пользователя
         $token = $this->extractTokenFromHeader();
-        if (!$token) {
-            return ApiResponse::error('Token required.', 401);
-        }
+        if (!$token) return ApiResponse::error('Token required.', 401);
         $user = $this->getCurrentUser($token);
-        if (!$user) {
-            return ApiResponse::error('User not found.', 404);
+        if (!$user) return ApiResponse::error('User not found.', 404);
+
+        $permissions = [];
+        if ($user['role'] === 'custom') {
+            $permissions = \App\Models\UserPermission::getPermissions($user['id']);
         }
+
         return ApiResponse::success([
             'user' => [
                 'id'    => $user['id'],
                 'email' => $user['email'],
                 'role'  => $user['role'],
+                'full_name' => $user['full_name'],
+                'permissions' => $permissions,
             ]
         ]);
     }
@@ -259,5 +264,89 @@ class AuthController extends BaseController
         file_put_contents(__DIR__ . '/../../storage/logs/portfolio.log', $log, FILE_APPEND);
 
         return ApiResponse::success(['message' => 'Пароль изменён']);
+    }
+
+    public function permissionsGet(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) return ApiResponse::error('Token required.', 401);
+        $this->checkAccess($token, 'admin', 'permissions.view');
+
+        $userId = (int)($payload['user_id'] ?? 0);
+        if ($userId <= 0) return ApiResponse::error('user_id required.', 400);
+
+        $user = \App\Models\User::find($userId);
+        if (!$user) return ApiResponse::error('User not found.', 404);
+
+        if ($user['role'] === 'custom') {
+            $perms = \App\Models\UserPermission::getPermissions($userId);
+            return ApiResponse::success(['role' => null, 'permissions' => $perms]);
+        } else {
+            return ApiResponse::success(['role' => $user['role'], 'permissions' => []]);
+        }
+    }
+
+    public function permissionsSet(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) return ApiResponse::error('Token required.', 401);
+        $this->checkAccess($token, 'admin', 'permissions.edit');
+
+        $userId = (int)($payload['user_id'] ?? 0);
+        if ($userId <= 0) return ApiResponse::error('user_id required.', 400);
+
+        $user = \App\Models\User::find($userId);
+        if (!$user) return ApiResponse::error('User not found.', 404);
+
+        $type = $payload['type'] ?? 'standard';
+        if ($type === 'standard') {
+            $role = $payload['role'] ?? null;
+            $allowed = ['admin','moderator','teacher','parent','student','canteen','educator','kpp'];
+            if (!$role || !in_array($role, $allowed)) return ApiResponse::error('Invalid role.', 400);
+            $db->query("UPDATE users SET role = ? WHERE id = ?", [$role, $userId]);
+            $db->query("DELETE FROM user_permissions WHERE user_id = ?", [$userId]);
+            return ApiResponse::success(['message' => 'Роль назначена']);
+        } elseif ($type === 'custom') {
+            $permissions = $payload['permissions'] ?? [];
+            if (!is_array($permissions)) return ApiResponse::error('permissions must be array.', 400);
+            $db->query("UPDATE users SET role = 'custom' WHERE id = ?", [$userId]);
+            \App\Models\UserPermission::setPermissions($userId, $permissions);
+            return ApiResponse::success(['message' => 'Персональные права сохранены']);
+        } else {
+            return ApiResponse::error('Invalid type.', 400);
+        }
+    }
+
+    public function permissionsList(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) return ApiResponse::error('Token required.', 401);
+        $this->checkAccess($token, 'admin', 'permissions.view');
+
+        // Берём из таблицы permissions
+        $rows = $db->fetchAll("SELECT id, name, group_name, label FROM permissions ORDER BY group_name, name");
+        $grouped = [];
+        foreach ($rows as $row) {
+            $grouped[$row['group_name']][] = [
+                'id' => $row['id'],
+                'name' => $row['name'],
+                'label' => $row['label']
+            ];
+        }
+        return ApiResponse::success($grouped);
+    }
+
+    public function roleList(DB $db, array $payload): ApiResponse
+    {
+        $token = $this->extractTokenFromHeader();
+        if (!$token) return ApiResponse::error('Token required.', 401);
+        $this->checkAccess($token, 'admin', 'permissions.view');
+
+        $roles = ['admin','moderator','teacher','parent','student','canteen','educator','kpp'];
+        $list = [];
+        foreach ($roles as $r) {
+            $list[] = ['id' => $r, 'name' => ucfirst($r), 'permissions' => []];
+        }
+        return ApiResponse::success($list);
     }
 }
